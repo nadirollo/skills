@@ -3,6 +3,12 @@
 Personal staging area for agent skills I want to test myself before
 contributing them to `fastly/agent-skills-internal`.
 
+## Location
+
+Cloned on the laptop at `~/workspace/ai-hub/skills`, which Coder Desktop syncs to
+`~/workspace/skills` on the `ai-hub` workspace. Run git (commit, push) from the
+laptop: ai-hub's Fastly GitHub credential cannot reach this personal repo.
+
 ## Layout
 
 Mirrors `fastly/agent-skills-internal`, so a plugin can be copied over as-is:
@@ -24,7 +30,8 @@ plugins/<plugin>/skills/<skill>/SKILL.md
 ## Testing locally
 
 ```
-claude plugin marketplace add ~/workspace/personal/skills
+claude plugin marketplace add ~/workspace/ai-hub/skills   # laptop
+claude plugin marketplace add ~/workspace/skills          # ai-hub
 claude plugin install <plugin>@nadirollo-skills --scope user
 ```
 
