@@ -1,0 +1,9 @@
+{
+  "name": "nadirollo-skills",
+  "owner": {
+    "name": "Nadir Lloret",
+    "email": "nadir.lloret@fastly.com"
+  },
+  "description": "Personal agent skills under test before contributing to fastly/agent-skills-internal",
+  "plugins": []
+}
