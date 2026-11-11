@@ -10,6 +10,7 @@ their reports, and coordinates follow-ups (review, CI fixes, PR comments).
 | Skill | Use |
 | --- | --- |
 | `/control-tower:dispatch [task]` | Hand a task to the tower. |
+| `/control-tower:setup [workspace]` | Set up, check or repair the Coder workspace the tower runs on. Run from your laptop. |
 
 ## Flow
 
@@ -51,6 +52,8 @@ claude plugin install control-tower@nadirollo-skills --scope user
 - `herdr` 0.9.5 or newer, `gh`, and a supported agent CLI (`claude` by
   default).
 - Linux (`/proc` is used for the capacity check).
+- `setup` runs on a macOS laptop with the `coder` CLI logged in, and targets
+  Fastly's `gcp-dev-generic` Coder template.
 
 ## Credits
 

@@ -1,10 +1,18 @@
 {
   "name": "control-tower",
-  "description": "Run a Claude session as a manager of worker agents in Herdr: turn a task into an approved spec, dispatch it to workers, watch them, and coordinate follow-ups",
-  "version": "0.1.0",
+  "description": "Run a Claude session as a manager of worker agents in Herdr, and set up the always-on Coder workspace it runs on",
+  "version": "0.2.0",
   "author": {
     "name": "Nadir Lloret",
     "email": "nadir.lloret@fastly.com"
   },
-  "keywords": ["herdr", "orchestration", "agents", "spec", "delegation"]
+  "keywords": [
+    "herdr",
+    "orchestration",
+    "agents",
+    "spec",
+    "delegation",
+    "coder",
+    "setup"
+  ]
 }
