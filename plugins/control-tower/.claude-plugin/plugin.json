@@ -1,7 +1,7 @@
 {
   "name": "control-tower",
   "description": "Run a Claude session as a manager of worker agents in Herdr, and set up the always-on Coder workspace it runs on",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "Nadir Lloret",
     "email": "nadir.lloret@fastly.com"

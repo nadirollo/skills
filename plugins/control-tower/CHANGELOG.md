@@ -6,6 +6,22 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.1] - 2026-11-13
+
+### Changed
+
+- `setup` installs both plugin marketplaces on the workspace from GitHub
+  (`nadirollo/skills`, `fastly/agent-skills-internal`) instead of copying
+  them, switches an existing folder source with the user's OK, and installs
+  the Fastly `coding` plugin for dispatch's review workers.
+- `setup` sets workspace agents to run without permission prompts: Claude
+  Code `bypassPermissions` with `skipDangerousModePermissionPrompt`, and
+  Copilot with `--yolo`. Copilot CLI is installed at its latest release.
+- `setup` no longer edits the laptop's SSH configuration: it checks the
+  workspace alias and suggests one (now with connection reuse) if missing.
+- `setup` offers `brew install --cask coder-desktop`, and suggests personal
+  global agent instructions without writing them.
+
 ## [0.3.0] - 2026-11-13
 
 ### Added

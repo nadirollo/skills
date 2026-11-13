@@ -7,7 +7,10 @@ differs; back up a differing file as `<file>.bak-<YYYYMMDD>` first.
 
 ## Laptop
 
-### `~/.ssh/conf.d/<ws>`
+### `~/.ssh/conf.d/<ws>` (suggested to the user; setup never writes it)
+
+Show this, filled in, only when `ssh <ws>` does not already reach the
+workspace. The user writes it.
 
 ```sshconfig
 Host <ws>
@@ -17,13 +20,24 @@ Host <ws>
     HostKeyAlias <ws>-coder
     UserKnownHostsFile ~/.ssh/known_hosts.<ws>-coder
     StrictHostKeyChecking yes
+    ControlMaster auto
     ControlPath ~/.ssh/control/<ws>-coder-%C
+    ControlPersist yes
 ```
 
 Mode `600`. `~/.ssh/config` must contain `Include conf.d/*` **before** any
 `Host *` block: SSH uses the first value it finds, so a `User` under `Host *`
-earlier in the file would override `<coder-user>`. Create
-`~/.ssh/control/` (mode `700`) if missing.
+earlier in the file would override `<coder-user>`. `~/.ssh/control/` (mode
+`700`) must exist. `ControlMaster`/`ControlPersist` reuse one connection for
+herdr-app and `ssh <ws>` commands; drop them if the user prefers.
+
+Then the user records the host key once (the connection runs through the
+Coder CLI, which already authenticates the workspace):
+
+```bash
+ssh -o StrictHostKeyChecking=accept-new <ws> true
+chmod 600 ~/.ssh/known_hosts.<ws>-coder
+```
 
 herdr-app reaches the workspace through this Host: its machine connection is
 plain `ssh <ws>`. `--disable-autostart` keeps its reconnect attempts from
@@ -93,10 +107,14 @@ git config --global credential.https://github.com.helper '!'"$HOME"'/.local/bin/
 
 ### `~/.local/bin/copilot` (mode `700`, only if Copilot CLI is chosen)
 
+Copilot CLI is the latest release, unpacked into `~/.local/opt/copilot`.
+`--yolo` runs it without permission prompts, like Claude Code in
+`bypassPermissions` (see below).
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-exec "$HOME/.local/bin/with-coder-github" "$HOME/.local/opt/copilot/copilot" "$@"
+exec "$HOME/.local/bin/with-coder-github" "$HOME/.local/opt/copilot/copilot" --yolo "$@"
 ```
 
 ### `~/.config/environment.d/git.conf`
@@ -206,6 +224,27 @@ Mode `755`, and in `~/.claude/settings.json`:
 ```json
 "statusLine": { "type": "command", "command": "bash <home>/.claude/statusline.sh" }
 ```
+
+## Agent permissions on the workspace
+
+Merged into the workspace's `~/.claude/settings.json` with `jq`, keeping any
+existing `permissions.allow`, `permissions.deny` and other keys:
+
+```json
+{
+  "permissions": { "defaultMode": "bypassPermissions" },
+  "skipDangerousModePermissionPrompt": true
+}
+```
+
+For example:
+
+```bash
+f=~/.claude/settings.json; [ -f "$f" ] || echo '{}' > "$f"
+jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+```
+
+Workspace only: never set these on the laptop.
 
 ## Model settings copied to the workspace
 

@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use when the user invokes /control-tower:setup to set up, check, or repair the laptop and always-on Coder workspace that control-tower runs on. Creates or reuses a gcp-dev-generic workspace, installs herdr-core, Claude Code, Coder-backed GitHub auth, Lavish and optional tools on it, installs herdr-app and Coder Desktop (Coder Connect) on the laptop, connects the app to the workspace, and installs control-tower. Safe to re-run.
+description: Use when the user invokes /control-tower:setup to set up, check, or repair the laptop and always-on Coder workspace that control-tower runs on. Creates or reuses a gcp-dev-generic workspace, installs herdr-core, Claude Code (agents run without permission prompts), Coder-backed GitHub auth, Lavish, the Fastly agent skills and optional tools on it, installs herdr-app and Coder Desktop (Coder Connect) on the laptop, connects the app to the workspace, and installs control-tower. Safe to re-run.
 argument-hint: "[workspace-name]"
 disable-model-invocation: true
 ---
@@ -21,9 +21,10 @@ Workspace name from the user: $ARGUMENTS
 | Workspace | herdr-core (`hc`), with linger on so terminals survive logout. |
 | Workspace | Claude Code, Node, GitHub auth through Coder, and Claude model settings mirrored from the laptop; the user logs in themselves. |
 | Workspace | Lavish (`lavish-axi`, pinned) and its control-tower environment file, for spec review in the browser. |
+| Workspace | Agents run without permission prompts: Claude Code in `bypassPermissions` mode, Copilot with `--yolo`. The workspace is the safe environment for that. |
 | Workspace | Optional: Copilot CLI, aws-cli, Chrome for agent-browser, and Claude Code preferences (status line, longer history). |
-| Workspace | The `control-tower` plugin. |
-| Laptop | An SSH alias with strict host-key checking. |
+| Workspace | The `control-tower` plugin and the Fastly agent skills (`coding` at least), both from GitHub. |
+| Laptop | An SSH alias for the workspace. Setup checks it and suggests one if missing; the user writes it. |
 | Laptop | herdr-app with the workspace added as a machine. |
 | Laptop | Coder Desktop with Coder Connect on, so `http://<ws>.coder:4387` reaches Lavish on the workspace. |
 
@@ -48,7 +49,15 @@ through Lavish over Coder Connect.
 - **Overwrite nothing silently.** Back up a differing file as
   `<file>.bak-<YYYYMMDD>` before replacing it, and report it.
 - **Pin and verify third-party tools.** Use the versions and installers in
-  `references/files.md`; never `npx -y` or an unpinned `@latest`.
+  `references/files.md`; never `npx -y` or an unpinned `@latest`. The one
+  exception is Copilot CLI, which is installed at its latest release.
+- **Never edit the user's SSH configuration** (`~/.ssh/config`,
+  `~/.ssh/conf.d/`, known-hosts files). Check it, and if something is
+  missing, show the user what to add and let them do it.
+- **Global agent instructions are personal.** Do not write
+  `~/.claude/CLAUDE.md`, `~/.claude/rules/`, `AGENTS.md` or Copilot
+  instructions on either side. Suggest that the user write their own
+  (step 12).
 - The exact file contents are in `references/files.md`. Use them as written.
 - Run workspace commands as `ssh <ws> '<command>'` once the alias exists, or
   `coder ssh <ws> -- <command>` before that. Start workspace commands with
@@ -101,20 +110,25 @@ through Lavish over Coder Connect.
 
 ## 2. SSH alias (laptop)
 
-herdr-app connects to the workspace with plain `ssh <ws>`, so this alias is
-what it uses.
+herdr-app connects to the workspace with plain `ssh <ws>`, so it needs a
+`Host <ws>` entry that reaches the workspace. This step only checks and
+suggests: **do not edit any SSH file yourself.**
 
-1. Write `~/.ssh/conf.d/<ws>` from `references/files.md`, and make sure
-   `~/.ssh/config` includes `conf.d/*` before any `Host *` block. If it
-   doesn't, show the user the line to add and where, and get their OK before
-   editing `~/.ssh/config`.
-2. If `~/.ssh/known_hosts.<ws>-coder` has no entry, connect once with
-   `ssh -o StrictHostKeyChecking=accept-new <ws> true` to record the host
-   key, then `chmod 600` the file. The connection runs through the Coder CLI,
-   which already authenticates the workspace.
-3. If the connection fails with a **changed host key** (common after a
-   rebuild), stop and tell the user. Do not delete the entry yourself.
-4. Verify: `ssh <ws> hostname` returns the workspace.
+1. Check: `ssh -G <ws>` shows a `proxycommand` that runs `coder ssh`, and
+   `ssh <ws> hostname` returns the workspace. Note what `ssh -G` reports for
+   `user`, `controlmaster` and `stricthostkeychecking`.
+2. **If it works,** leave it as it is, even if it differs from the
+   suggestion. Mention any difference worth knowing (for example no
+   connection reuse) as a suggestion only.
+3. **If there is no working entry,** show the user the suggested
+   `~/.ssh/conf.d/<ws>` from `references/files.md` (filled in), the
+   `Include conf.d/*` line and where it must go in `~/.ssh/config` (before
+   any `Host *` block), and the one-time command that records the host key.
+   Wait until they say it is done, then check again.
+4. If the connection fails with a **changed host key** (common after a
+   rebuild), stop and tell the user. Do not touch the known-hosts entry.
+5. Until the alias works, run workspace commands with
+   `coder ssh <ws> -- <command>`. Steps 9 and later need the alias.
 
 ## 3. Workspace base
 
@@ -152,7 +166,7 @@ Ask which the user wants, then install each into `~/.local`:
 
 | Tool | Install |
 | --- | --- |
-| Copilot CLI | Latest `copilot-linux-<x64\|arm64>.tar.gz` from `github/copilot-cli` releases into `~/.local/opt/copilot`, plus the `copilot` wrapper from `references/files.md`. |
+| Copilot CLI | The latest `copilot-linux-<x64\|arm64>.tar.gz` from the `github/copilot-cli` releases (`gh release view --repo github/copilot-cli`), unpacked into `~/.local/opt/copilot`, plus the `copilot` wrapper from `references/files.md` (GitHub auth through Coder, and `--yolo`). On a re-run, replace it if a newer release exists. |
 | aws-cli | `awscli-exe-linux-<x86_64\|aarch64>.zip` from awscli.amazonaws.com, installed with `./aws/install -i ~/.local/share/aws-cli -b ~/.local/bin`. Needed for Bedrock. |
 | Chrome for agent-browser | `npm install -g agent-browser`, then `agent-browser install --with-deps` (Chrome for Testing and its system libraries; needs `sudo`). |
 
@@ -180,17 +194,29 @@ Verify each with `--version`.
    name.
 3. Verify end to end once Coder Connect is on (step 10).
 
-## 8. Claude Code preferences (workspace)
+## 8. Claude Code settings (workspace)
 
-Ask about each; apply only what the user says yes to, merging into the
-workspace's `~/.claude/settings.json` with `jq`:
+Merge into the workspace's `~/.claude/settings.json` with `jq`; never replace
+the file.
 
-- **Status line** with model, session cost, context use and folder:
-  `~/.claude/statusline.sh` and the `statusLine` setting from
-  `references/files.md`. If a different `statusLine` is already set, show it
-  and ask before replacing it.
-- **Keep session history for a year:** `"cleanupPeriodDays": 365`. The
-  default is 30 days.
+1. **Agent permissions (recommended).** The workspace is a disposable,
+   single-user VM that holds no credentials beyond the user's own logins, so
+   agents on it run without permission prompts: workers then block only on
+   real questions, not on every command. Set the keys in
+   `references/files.md` (`permissions.defaultMode: "bypassPermissions"`,
+   `skipDangerousModePermissionPrompt: true`). Explain this to the user and
+   apply it after their OK. Keep any existing `permissions.allow` and
+   `permissions.deny` entries. The dispatch worker rules (no merges,
+   releases, deploys or infrastructure applies) still apply; they come from
+   the worker prompt, not from permission prompts.
+2. **Preferences.** Ask about each; apply only what the user says yes to:
+
+   - **Status line** with model, session cost, context use and folder:
+     `~/.claude/statusline.sh` and the `statusLine` setting from
+     `references/files.md`. If a different `statusLine` is already set, show
+     it and ask before replacing it.
+   - **Keep session history for a year:** `"cleanupPeriodDays": 365`. The
+     default is 30 days.
 
 ## 9. herdr-app (laptop)
 
@@ -218,10 +244,11 @@ workspace's `~/.claude/settings.json` with `jq`:
 
 ## 10. Coder Connect (laptop)
 
-1. If Coder Desktop is missing, point the user to Coder's install
-   instructions for it (https://coder.com/docs/user-guides/desktop). They
-   sign in to the same Coder deployment and turn Coder Connect on
-   themselves.
+1. If Coder Desktop is missing, offer to install it with
+   `brew install --cask coder-desktop` (Coder's instructions:
+   https://coder.com/docs/user-guides/desktop). The user then signs in to
+   the same Coder deployment and turns Coder Connect on themselves; macOS
+   asks them to allow its network extension.
 2. Verify the name resolves: `dscacheutil -q host -a name <connect-host>`
    returns an address.
 3. Verify Lavish end to end: on the workspace, write a one-line HTML page to
@@ -232,18 +259,36 @@ workspace's `~/.claude/settings.json` with `jq`:
    must print `200`. End the session with `lavish-axi end <page>`, and
    delete the page.
 
-## 11. control-tower (workspace)
+## 11. Plugins (workspace)
 
-1. Find where this plugin came from on the laptop (`claude plugin list`, and
-   the marketplace source in `claude plugin marketplace list`).
-2. **If that marketplace is a GitHub repo the workspace can reach** (try
-   `with-coder-github git ls-remote <repo-url>` on the workspace), add the
-   same marketplace there and install `control-tower` from it.
-3. **Otherwise** (e.g. a personal repo outside the Fastly orgs, which Coder's
-   GitHub credential cannot see), copy the marketplace directory to the
-   workspace and add it as a local marketplace. Tell the user that updates
-   then need another copy.
-4. Create the tasks root, `~/workspace/control-tower/tasks`, if missing.
+Install both marketplaces from GitHub, so the workspace updates with
+`claude plugin marketplace update` and never needs a copy from the laptop.
+
+1. **control-tower.** Its marketplace is the public `nadirollo/skills` repo:
+
+   ```bash
+   claude plugin marketplace add nadirollo/skills
+   claude plugin install control-tower@nadirollo-skills --scope user
+   ```
+
+   If `nadirollo-skills` is already there with another source (a folder, a
+   copy), show the user and, with their OK, switch it:
+   `claude plugin marketplace remove nadirollo-skills`, then the two commands
+   above. Leave the old folder in place.
+2. **Fastly agent skills.** The `fastly/agent-skills-internal` repo is
+   internal; the git credential helper from step 3.2 gives the workspace
+   access. Add it as the `fastly-agent-skills-internal` marketplace:
+
+   ```bash
+   claude plugin marketplace add fastly/agent-skills-internal
+   claude plugin install coding@fastly-agent-skills-internal --scope user
+   ```
+
+   `coding` provides the `coding:code-review` skill that dispatch's review
+   workers use. Then show the user the other plugins installed from that
+   marketplace on the laptop (`claude plugin list`) and install the ones
+   they pick, with `--scope user`.
+3. Create the tasks root, `~/workspace/control-tower/tasks`, if missing.
 
 ## 12. Verify and report
 
@@ -252,7 +297,7 @@ Run every check again and report a table:
 | Check | How |
 | --- | --- |
 | Workspace running, no auto-stop | `coder list -o json` |
-| SSH alias works | `ssh <ws> hostname` |
+| SSH alias works | `ssh <ws> hostname`; if not, the suggestion from step 2 |
 | Tools present | `--version` for hc, claude, node, gh, lavish-axi, and each optional tool |
 | GitHub auth | `gh auth status` on the workspace |
 | Linger on | `loginctl show-user $USER -p Linger` on the workspace |
@@ -260,7 +305,9 @@ Run every check again and report a table:
 | Core survives logout | `hc server status` on the workspace: `keeps_running_after_logout: true` |
 | Lavish environment | `~/.config/control-tower/lavish.env` names `<connect-host>` |
 | Coder Connect reaches Lavish | step 10.3 returned `200` |
-| control-tower installed | `claude plugin list` on the workspace |
+| control-tower installed | `claude plugin list` on the workspace, and `claude plugin marketplace list` shows `nadirollo-skills` from GitHub |
+| Agents run without prompts | workspace `~/.claude/settings.json` has `permissions.defaultMode: "bypassPermissions"` and `skipDangerousModePermissionPrompt: true`; the `copilot` wrapper passes `--yolo` |
+| Fastly agent skills | `claude plugin list` on the workspace shows `coding@fastly-agent-skills-internal` and the plugins the user picked |
 | Preferences | status line and history setting, if chosen |
 
 For each row give: OK, fixed (and what was done), or needs the user (and the
@@ -268,11 +315,18 @@ exact action). End with the logins the user still has to do on the
 workspace (model provider, Copilot, GitHub external auth if unlinked) and on
 the laptop (Coder Desktop).
 
+Finally, suggest, without writing anything, that the user keep their own
+global agent instructions on the workspace: `~/.claude/CLAUDE.md` for Claude
+Code (and `~/.copilot/copilot-instructions.md` for Copilot), with how they
+like agents to work, for example how terse to be, or that every merge needs
+their explicit approval. These are personal, so setup does not create
+them.
+
 ## Common repairs
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Machine shows Attention or `needs_login` in herdr-app | SSH failed, or the host key changed after a rebuild | Check `ssh <ws> true`; for a changed key, confirm with the user it was rebuilt, then replace the entry in `~/.ssh/known_hosts.<ws>-coder`; then `hc machine login <ws>` |
+| Machine shows Attention or `needs_login` in herdr-app | SSH failed, or the host key changed after a rebuild | Check `ssh <ws> true`; for a changed key, confirm with the user it was rebuilt and ask them to replace its known-hosts entry; then `hc machine login <ws>` |
 | Terminals gone after logging out | Linger off | Step 4.2 |
 | Terminals restarted as fresh shells | The workspace rebooted or the core was restarted | Expected: kept terminals get fresh shells, not their old programs |
 | Lavish link does not load | Coder Connect off, or Lavish not running | Turn on Coder Connect; the tower reopens the session |
@@ -281,6 +335,7 @@ the laptop (Coder Desktop).
 | `gh` or `git push` fails with 401 or 403 in a long-lived terminal | Token exported at shell start expired | Use the `gh` wrapper and git credential helper, step 3.2 |
 | `403` cloning a personal repo | Coder's GitHub credential covers only the orgs its app is installed on | Expected; use a laptop checkout or a separate credential |
 | Claude can't reach the model | Provider login expired | Log in again on the workspace (step 6.3) |
+| Workers stop at permission prompts for every command | Agent permissions not set | Step 8.1 |
 
 ## Anti-patterns (DO NOT)
 
@@ -288,7 +343,9 @@ the laptop (Coder Desktop).
 - Copying tokens, SSO caches, API keys or credential files to the workspace.
 - Stopping, restarting or replacing a running hc core without the user's OK.
 - Approving an hc copy or replace prompt during `hc machine add`.
-- Deleting a known-hosts entry because a host key changed, without the user.
+- Editing `~/.ssh/config`, `~/.ssh/conf.d/` or any known-hosts file. Suggest; the user edits.
+- Writing global agent instructions (`~/.claude/CLAUDE.md`, rules, `AGENTS.md`) for the user.
+- Copying a marketplace to the workspace when it can be added from GitHub.
 - Passing build parameters with `--parameter` when their names contain spaces.
 - Installing Lavish unpinned, with install scripts, or through `npx -y`.
 - Exposing Lavish through the Coder port-share URL or a public port.
