@@ -6,6 +6,32 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-11-13
+
+### Added
+
+- `models` skill (`/control-tower:models`): starts Claude Code and Copilot
+  CLI in hidden hc sessions, reads the models each offers from the harness
+  itself (Claude's `/model` picker; Copilot's model list and picker), and
+  writes `~/.config/control-tower/models.json`. Sends nothing to a model.
+- `setup` writes that file once on the workspace, and makes Claude Code and
+  Copilot trust every folder there (`/`), so workers never stop at a
+  folder-trust prompt.
+
+### Changed
+
+- `dispatch`: the spec page's model dropdowns come from `models.json`
+  (grouped, with per-model efforts), falling back to the built-in lists.
+- `dispatch`: the grilling and the first spec's approval share one Lavish
+  page and session (`spec.html`): the page turns into the spec when the
+  grilling is confirmed, and tells the user what happens at each step.
+
+- `dispatch`: the tower names its herdr-app space after the task (a 2–3
+  word description) at intake, through hc's `doc.get`/`doc.set` on the
+  machine's `herdr-app` layout document, instead of asking the user to
+  rename it. Only a space nobody has named is renamed; a name the user gave
+  is kept. Falls back to asking when the rename fails.
+
 ## [0.4.1] - 2026-11-13
 
 ### Changed

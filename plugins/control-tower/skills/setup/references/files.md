@@ -246,6 +246,21 @@ jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissio
 
 Workspace only: never set these on the laptop.
 
+## Folder trust on the workspace
+
+Copilot: `/` in `trustedFolders` in `~/.copilot/config.json`, keeping
+existing entries (back up the file first):
+
+```bash
+f=~/.copilot/config.json; [ -f "$f" ] || echo '{}' > "$f"
+cp -p "$f" "$f.bak-$(date +%Y%m%d)"
+jq '.trustedFolders = ((.trustedFolders // []) + ["/"] | unique)' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+```
+
+Claude Code: accepted through its own trust question in `/` (setup step
+8.2), never by editing `~/.claude.json`. Workspace only: never trust `/` on
+the laptop.
+
 ## Model settings copied to the workspace
 
 From the laptop's `~/.claude/settings.json`, copy **only** these keys if set,

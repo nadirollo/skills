@@ -14,9 +14,9 @@
     data-lavish-revision="r<N>" on each block you changed or added, so the
     user can see what changed. Lavish lists at most 6 rounds.
   - Keep the page self-contained: inline styles only, no CDN, no local assets.
-  - {{HARNESSES_JSON}} is the JSON from references/harnesses.md (installed
-    harnesses only, with the task's defaults). Replace every "</" in it with
-    "<\/". The page builds the harness, model and effort dropdowns from it;
+  - {{HARNESSES_JSON}} is built as references/harnesses.md says (from
+    ~/.config/control-tower/models.json when it exists, plus the task's
+    defaults). Replace every "</" in it with "<\/". The page builds the harness, model and effort dropdowns from it;
     choosing them does not change the revision.
   - {{REVIEW_PREP_DEFAULT}} is "checked" when the worker changes code, else
     empty. When checked at approval, the approval also covers the review-prep
@@ -147,7 +147,27 @@
   try { data = JSON.parse(document.getElementById('ct-harnesses').textContent); } catch (e) {}
   const form = document.getElementById('ct-approve');
   const byId = Object.fromEntries((data.harnesses || []).map((h) => [h.id, h]));
-  const fill = (sel, values, want) => {
+  // Models are strings or {id, label, group, efforts} (from models.json).
+  const norm = (m) => (typeof m === 'string' ? { id: m, label: m === 'default' ? 'default (harness setting)' : m } : { ...m, label: m.label || m.id });
+  const modelsOf = (h) => (h.models || []).map(norm);
+  const effortsFor = (h, modelId) => {
+    const m = modelsOf(h).find((x) => x.id === modelId);
+    return m && Array.isArray(m.efforts) && m.efforts.length ? m.efforts : h.efforts;
+  };
+  const fillModels = (sel, models, want) => {
+    const kids = [], groups = new Map();
+    for (const m of models) {
+      const o = new Option(m.label, m.id);
+      if (m.group) {
+        if (!groups.has(m.group)) { const og = document.createElement('optgroup'); og.label = m.group; groups.set(m.group, og); kids.push(og); }
+        groups.get(m.group).append(o);
+      } else kids.push(o);
+    }
+    kids.push(new Option('Other…', '__other'));
+    sel.replaceChildren(...kids);
+    sel.value = models.some((m) => m.id === want) ? want : (models[0] || { id: '__other' }).id;
+  };
+  const fillEfforts = (sel, values, want) => {
     sel.replaceChildren(...values.map((v) => new Option(v === 'default' ? 'default (harness setting)' : v, v)));
     sel.value = values.includes(want) ? want : values[0];
   };
@@ -155,16 +175,21 @@
     { key: 'worker', h: 'harness', m: 'model', mo: 'model_other', e: 'effort' },
     { key: 'reviewer', h: 'r_harness', m: 'r_model', mo: 'r_model_other', e: 'r_effort' },
   ];
+  const syncEfforts = (g, want) => {
+    const h = byId[form[g.h].value];
+    if (!h) return;
+    const model = form[g.m].value === '__other' ? '' : form[g.m].value;
+    fillEfforts(form[g.e], effortsFor(h, model), want ?? form[g.e].value);
+  };
   const setup = (g, harnessId) => {
     const d = (data.defaults || {})[g.key] || {};
     const h = byId[harnessId] || data.harnesses[0];
     if (!h) return;
-    const models = [...h.models, '__other'];
-    fill(form[g.m], models, h.id === d.harness ? d.model : 'default');
-    form[g.m].querySelector('option[value="__other"]').textContent = 'Other…';
-    if (d.harness === h.id && d.model && !h.models.includes(d.model)) { form[g.m].value = '__other'; form[g.mo].value = d.model; }
-    fill(form[g.e], h.efforts, h.id === d.harness ? d.effort : 'default');
+    const models = modelsOf(h), mine = h.id === d.harness;
+    fillModels(form[g.m], models, mine ? d.model : 'default');
+    if (mine && d.model && !models.some((m) => m.id === d.model)) { form[g.m].value = '__other'; form[g.mo].value = d.model; }
     form[g.mo].hidden = form[g.m].value !== '__other';
+    syncEfforts(g, mine ? d.effort : 'default');
   };
   for (const g of groups) {
     const d = (data.defaults || {})[g.key] || {};
@@ -172,7 +197,7 @@
     form[g.h].value = byId[d.harness] ? d.harness : (data.harnesses[0] || {}).id;
     setup(g, form[g.h].value);
     form[g.h].addEventListener('change', () => { setup(g, form[g.h].value); render(); });
-    form[g.m].addEventListener('change', () => { form[g.mo].hidden = form[g.m].value !== '__other'; render(); });
+    form[g.m].addEventListener('change', () => { form[g.mo].hidden = form[g.m].value !== '__other'; syncEfforts(g); render(); });
     form[g.mo].addEventListener('input', render);
     form[g.e].addEventListener('change', render);
   }
@@ -180,7 +205,7 @@
     const model = form[g.m].value === '__other' ? form[g.mo].value.trim() : form[g.m].value;
     return { harness: form[g.h].value, model, effort: form[g.e].value };
   };
-  const valid = (r) => byId[r.harness] && MODEL_RE.test(r.model) && byId[r.harness].efforts.includes(r.effort);
+  const valid = (r) => byId[r.harness] && MODEL_RE.test(r.model) && effortsFor(byId[r.harness], r.model).includes(r.effort);
   function render() {
     const rp = form.review_prep.checked;
     document.getElementById('ct-reviewer').hidden = !rp;

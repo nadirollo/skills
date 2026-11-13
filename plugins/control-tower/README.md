@@ -11,6 +11,7 @@ contexts, watches them, reads their reports, and coordinates follow-ups
 | Skill | Use |
 | --- | --- |
 | `/control-tower:dispatch [task]` | Hand a task to the tower. |
+| `/control-tower:models [harness,...]` | Refresh the models each installed harness (Claude Code, Copilot CLI) offers, for the spec approval page. Run on the workspace. |
 | `/control-tower:setup [workspace]` | Set up, check or repair everything the tower needs: the Coder workspace (herdr-core, Claude Code, GitHub auth, Lavish) and the laptop (herdr-app, Coder Connect). Run from your laptop. |
 
 ## Flow
@@ -18,13 +19,15 @@ contexts, watches them, reads their reports, and coordinates follow-ups
 Each task gets its own herdr-app space. You create the space, start Claude
 in it and run `/control-tower:dispatch`; that session is the task's tower.
 
-1. **Intake**: the tower works out the target repo and asks whether you want
-   a grilling interview first. The grilling runs in your browser with
+1. **Intake**: the tower names an unnamed space after the task (2–3 words), works
+   out the target repo, and asks whether you want a grilling interview
+   first. The grilling runs in your browser with
    [Lavish](https://github.com/kunchenguid/lavish-axi): one card per
    question with the tower's recommendation; answer them one by one, ask
    about any of them, and send the round.
 2. **Spec**: written from the grilling or straight from your description.
-   You review it in Lavish: annotate anything to change, pick the worker's
+   You review it in Lavish, on the same page as the grilling if there was
+   one: annotate anything to change, pick the worker's
    harness (Claude Code, Copilot CLI), model and effort from dropdowns, and
    whether a review prep follows, then press Approve. No worker starts until
    you approve its spec. Without Lavish, all of this happens in the chat.

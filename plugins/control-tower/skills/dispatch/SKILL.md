@@ -73,7 +73,10 @@ Check before the first dispatch, and stop with a clear message if any fails:
    creates both). Without them, grilling, spec review and report sign-off
    happen in the chat (see [Without Lavish](#without-lavish)).
 5. Note which harnesses from `references/harnesses.md` are installed
-   (`command -v claude copilot ...`). Only those are offered.
+   (`command -v claude copilot ...`). Only those are offered. Their models
+   come from `~/.config/control-tower/models.json` (see
+   `references/harnesses.md`); if it is missing or older than 7 days, say so
+   once and offer `/control-tower:models`, without blocking on it.
 
 ## Settings
 
@@ -105,6 +108,39 @@ The server listens only on loopback. The user reaches it from the laptop
 over Coder Connect at `http://<connect-host>:4387`, where `<connect-host>`
 is `LAVISH_AXI_LINK_HOST` in that file (for example `ai-hub.coder`).
 
+## Naming the space
+
+herdr-app keeps each machine's spaces in a document in that machine's hc
+core, so you rename your own space through hc, from the machine you run on.
+`doc.set` writes only if the version still matches, so it cannot overwrite a
+change the app made in between.
+
+```bash
+name='<2-3 word description>'   # plain words: letters, digits, spaces, - and ·
+space=$(hc get "$HC_TERMINAL_ID" --json | jq -r '.labels["herdr.space"] // empty')
+doc=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"doc.get","params":{"name":"herdr-app"}}' | hc connect)
+if [ -z "$space" ] || ! jq -e --arg s "$space" '.result.value.spaces | any(.id == $s)' <<<"$doc" >/dev/null; then
+  echo "space not found"
+elif current=$(jq -r --arg s "$space" '.result.value.spaces[] | select(.id == $s) | .name // ""' <<<"$doc"); [ -n "$current" ]; then
+  echo "already named: $current"
+else
+  jq -c --arg s "$space" --arg n "$name" '.result | {jsonrpc: "2.0", id: 2, method: "doc.set",
+    params: {name: "herdr-app", version: .version,
+             value: (.value | .spaces |= map(if .id == $s then .name = $n else . end))}}' <<<"$doc" \
+    | hc connect | jq -c '{result, error}'
+fi
+```
+
+- `already named`: someone named the space (the user, or a tower before
+  you). Leave it and log it. In the document an unnamed space has an empty
+  `name`; the app then shows a name of its own, from its folder or repo.
+- `error.data.kind` `conflict`: the app changed the layout in between. Run
+  it all again from `doc.get` (at most three times), checking the name again.
+- An empty `space`, "space not found", or any other error: skip the rename,
+  log it, and tell the user they can name the space themselves (Shift+F2).
+- Change nothing else in that document: only your own space's `name`.
+- The app shows the new name at once; check it with `doc.get` if unsure.
+
 ## Labels
 
 Every terminal you start carries these hc labels:
@@ -128,9 +164,9 @@ id.
 ```text
 <task>/
 ├── log.md                    # owner, status, and every action and decision
-├── grilling.html             # the grilling, if chosen (Lavish)
+├── grilling.html             # record of the grilling, if chosen (copy at confirmation)
 ├── spec.md                   # first worker's spec (the source of truth)
-├── spec.html                 # its Lavish review copy
+├── spec.html                 # its Lavish page: the grilling first, then the spec
 ├── report.md                 # first worker's report
 ├── report.html               # its Lavish sign-off page
 └── followups/
@@ -176,8 +212,12 @@ where the task stands.
 ### 1. Intake
 
 1. Create the task folder and `log.md` (Status: `drafting`).
-2. Tell the user, once, they can rename the space to `ct · <slug>`
-   (Shift+F2) so it is easy to find. Do not wait for it.
+2. **Name the space** after the task: a 2–3 word description in lowercase
+   (for example `forge tag split`), so the user can tell spaces apart. Do it
+   yourself, right after creating the task folder, with
+   [Naming the space](#naming-the-space), and log it. Only a space nobody
+   has named gets renamed: never replace a name the user gave it, then or
+   later.
 3. Work out the facts you can: target repo (match the task to repos under
    `~/workspace`), current branch, relevant PRs or CI runs. Ask the user only
    if the repo is ambiguous or not cloned.
@@ -196,16 +236,22 @@ understanding. Every settled decision becomes a bullet in the spec's
 
 **How** to ask: in Lavish, not in the chat (in the chat only
 [without Lavish](#without-lavish)). The user reads each question on its own
-card and answers them one by one before sending the round:
+card and answers them one by one before sending the round.
 
-1. Copy `references/grilling-round.html` to `<task>/grilling.html` and fill
+**One page from grilling to approval.** The grilling runs in the file that
+becomes the first spec's review page, `<task>/spec.html`, so the user stays
+in one Lavish session and one browser tab: the page updates itself after
+every round, then turns into the spec when the grilling is confirmed.
+
+1. Copy `references/grilling-round.html` to `<task>/spec.html` and fill
    its JSON block with round 1, following the comment at the top. Each
    question keeps the grilling format's parts: title, body, choices if any,
    and your recommended answer worded so "yes" accepts it.
 2. Open it with the [Lavish environment](#lavish-environment):
-   `lavish-axi <absolute path to grilling.html>`. Give the user the session
-   URL on its own line, and say Coder Connect must be on.
-3. Wait with `lavish-axi poll <grilling.html>` as a background command, as
+   `lavish-axi <absolute path to spec.html>`. Give the user the session
+   URL on its own line, and say Coder Connect must be on, and that the same
+   page will carry the spec for approval afterwards.
+3. Wait with `lavish-axi poll <spec.html>` as a background command, as
    for specs ([3a](#3a-review-in-lavish), step 3).
 4. A `grill-round` prompt carries `data.items`, one per answered question.
    Account for every id:
@@ -222,8 +268,15 @@ card and answers them one by one before sending the round:
    `agent_note`. Then poll again with `--agent-reply "<one line>"`.
 6. When the frontier is empty, set `mode` to `"confirm"` with every settled
    decision. A `grill-confirm` prompt with `data.answer` `confirmed` ends the
-   grilling: log it, run `lavish-axi end <grilling.html>`, and draft the
-   spec. `changes` means its notes go back into the tree as a new round.
+   grilling; `changes` means its notes go back into the tree as a new round.
+   On `confirmed`, **do not end the session**:
+   1. Log it, and keep a record: `cp <task>/spec.html <task>/grilling.html`.
+   2. Tell the user on the page right away that the spec is coming: set
+      `agent_note` to "Confirmed. Drafting the spec: this page turns into it
+      shortly." and run `lavish-axi reply <spec.html> --agent-reply "<same>"`.
+   3. Write `spec.md`, then write the spec page over `spec.html`
+      ([3a](#3a-review-in-lavish), step 1) and continue with step 3 there:
+      the session is already open, so do not open it again.
 7. Look up facts while the user answers: a running lookup only holds back
    the questions that depend on it. Answers count only from that page's
    poll or from this chat, as for specs.
@@ -263,6 +316,8 @@ For each spec:
    `lavish-axi <absolute path to spec.html>`. Log the session URL it prints
    (`http://<connect-host>:4387/session/<key>`) and give it to the user on its
    own line so they can Cmd-click it. Say Coder Connect must be on.
+   **After a grilling** the session is already open on this file: skip this
+   step; the page the user is on reloads into the spec.
 3. **Wait** with a background command (in Claude Code, the Bash tool's
    `run_in_background`), never in the foreground:
 
@@ -270,7 +325,10 @@ For each spec:
    lavish-axi poll <absolute path to spec.html>
    ```
 
-   Several specs: one session and one background poll per spec.
+   After a grilling, add `--agent-reply "Spec revision 1 is ready: review
+   it here, pick how the worker runs, and approve."`. Several specs: the
+   first one uses the grilling's session; each other one gets its own
+   session and background poll.
 4. **When the poll returns**, read every prompt it delivered:
    - **Approval**: a prompt with tag `approval`, `data.answer` `approved`, and
      `data.revision` equal to the spec's current revision. The spec is
@@ -279,8 +337,11 @@ For each spec:
      and how its reviewers run. Validate them against
      `references/harnesses.md`; if any value fails, the spec is still
      approved but ask in the chat for the run settings. Log the approval with
-     the revision and the run settings, run `lavish-axi end <spec.html>`, and
-     tell the user in the chat that you are launching, and how.
+     the revision and the run settings. Tell the user on the page, then end
+     the session: `lavish-axi reply <spec.html> --agent-reply "Approved
+     revision <N>. Launching <worker> as <harness> · <model> · effort
+     <effort>."`, then `lavish-axi end <spec.html>`. Say the same in the
+     chat.
    - **An approval for an older revision**: not an approval. Tell the user
      the spec has changed since then and poll again.
    - **Notes** (on elements, text, or free messages): edit `spec.md` first,

@@ -22,6 +22,8 @@ Workspace name from the user: $ARGUMENTS
 | Workspace | Claude Code, Node, GitHub auth through Coder, and Claude model settings mirrored from the laptop; the user logs in themselves. |
 | Workspace | Lavish (`lavish-axi`, pinned) and its control-tower environment file, for spec review in the browser. |
 | Workspace | Agents run without permission prompts: Claude Code in `bypassPermissions` mode, Copilot with `--yolo`. The workspace is the safe environment for that. |
+| Workspace | Claude Code and Copilot trust every folder (`/`), so no session stops at a folder-trust prompt. |
+| Workspace | `~/.config/control-tower/models.json`: the models each harness offers, for dispatch's spec approval page. |
 | Workspace | Optional: Copilot CLI, aws-cli, Chrome for agent-browser, and Claude Code preferences (status line, longer history). |
 | Workspace | The `control-tower` plugin and the Fastly agent skills (`coding` at least), both from GitHub. |
 | Laptop | An SSH alias for the workspace. Setup checks it and suggests one if missing; the user writes it. |
@@ -209,7 +211,33 @@ the file.
    `permissions.deny` entries. The dispatch worker rules (no merges,
    releases, deploys or infrastructure applies) still apply; they come from
    the worker prompt, not from permission prompts.
-2. **Preferences.** Ask about each; apply only what the user says yes to:
+2. **Folder trust (recommended, with 8.1).** For the same reason, Claude
+   Code and Copilot trust every folder on the workspace, so a worker started
+   in a new worktree or scratch folder never stops at a trust prompt. Both
+   treat a trusted folder's subfolders as trusted, so trusting `/` covers
+   everything. Explain it with 8.1 and apply it after the user's OK, on the
+   workspace only:
+   - **Copilot:** add `/` to `trustedFolders` in `~/.copilot/config.json`
+     (`references/files.md`), keeping existing entries.
+   - **Claude Code:** let Claude record it itself; never edit
+     `~/.claude.json` by hand (every running session rewrites it). Start it
+     in `/` in a hidden hc terminal, check the screen shows its trust
+     question for `/`, choose "Yes, I trust this folder", then end it:
+
+     ```bash
+     hc run --bg --json --no-parent --no-notify --name ct-trust-root --cwd / claude
+     hc read ct-trust-root --lines 0      # must ask to trust "/"; read it before any key
+     hc keys ct-trust-root down enter     # "Yes, I trust this folder"
+     hc kill ct-trust-root; hc rm ct-trust-root
+     ```
+
+     If it shows no question, `/` is already trusted.
+   - **Verify** each: start it in a new folder outside your home
+     (`mktemp -d /var/tmp/ct-trust.XXXXXX`) the same way and check no trust
+     question shows, then end it and remove the folder. If Claude still
+     asks there, trust `$HOME` and `/tmp` the same way instead and tell the
+     user that folders elsewhere will still ask.
+3. **Preferences.** Ask about each; apply only what the user says yes to:
 
    - **Status line** with model, session cost, context use and folder:
      `~/.claude/statusline.sh` and the `statusLine` setting from
@@ -238,9 +266,9 @@ the file.
    `! stops at logout`, and `hc exec --on <ws> hostname` returns the
    workspace.
 5. Show the user how to start a task: in herdr-app, select a space on
-   `<ws>`, press Cmd+N for a new space on that machine, name it with
-   Shift+F2 (e.g. `ct · <task>`), run `claude` in it, then
-   `/control-tower:dispatch <task>`.
+   `<ws>`, press Cmd+N for a new space on that machine, run `claude` in
+   it, then `/control-tower:dispatch <task>`. The tower names the space
+   after the task itself.
 
 ## 10. Coder Connect (laptop)
 
@@ -289,6 +317,20 @@ Install both marketplaces from GitHub, so the workspace updates with
    marketplace on the laptop (`claude plugin list`) and install the ones
    they pick, with `--scope user`.
 3. Create the tasks root, `~/workspace/control-tower/tasks`, if missing.
+4. **Model list.** Write `~/.config/control-tower/models.json`, which the
+   dispatch spec page loads into its model dropdowns, by running the
+   `models` skill's probe on the workspace (about a minute; it sends nothing
+   to a model):
+
+   ```bash
+   ssh <ws> 'export PATH=$HOME/.local/bin:$PATH
+     python3 -I "$(ls -d ~/.claude/plugins/cache/*/control-tower/*/skills/models/scripts/probe_models.py | sort -V | tail -1)"'
+   ```
+
+   It reports the number of models per harness. A harness that is not
+   logged in yet can fail: say which, and tell the user to run
+   `/control-tower:models` in a workspace Claude session after logging in.
+   On a re-run, run it again: it refreshes the list.
 
 ## 12. Verify and report
 
@@ -308,6 +350,8 @@ Run every check again and report a table:
 | control-tower installed | `claude plugin list` on the workspace, and `claude plugin marketplace list` shows `nadirollo-skills` from GitHub |
 | Agents run without prompts | workspace `~/.claude/settings.json` has `permissions.defaultMode: "bypassPermissions"` and `skipDangerousModePermissionPrompt: true`; the `copilot` wrapper passes `--yolo` |
 | Fastly agent skills | `claude plugin list` on the workspace shows `coding@fastly-agent-skills-internal` and the plugins the user picked |
+| Folder trust | step 8.2's check: Claude and Copilot start in a new folder under `/var/tmp` without a trust question |
+| Model list | `~/.config/control-tower/models.json` on the workspace lists every installed harness, none `stale` |
 | Preferences | status line and history setting, if chosen |
 
 For each row give: OK, fixed (and what was done), or needs the user (and the
@@ -336,6 +380,8 @@ them.
 | `403` cloning a personal repo | Coder's GitHub credential covers only the orgs its app is installed on | Expected; use a laptop checkout or a separate credential |
 | Claude can't reach the model | Provider login expired | Log in again on the workspace (step 6.3) |
 | Workers stop at permission prompts for every command | Agent permissions not set | Step 8.1 |
+| A worker stops at "trust this folder" | Folder trust not set | Step 8.2 |
+| The spec page offers only a few models, or says the list is missing | `models.json` missing or old | Step 11.4, or `/control-tower:models` on the workspace |
 
 ## Anti-patterns (DO NOT)
 
@@ -346,6 +392,8 @@ them.
 - Editing `~/.ssh/config`, `~/.ssh/conf.d/` or any known-hosts file. Suggest; the user edits.
 - Writing global agent instructions (`~/.claude/CLAUDE.md`, rules, `AGENTS.md`) for the user.
 - Copying a marketplace to the workspace when it can be added from GitHub.
+- Trusting `/` (or any folder) for Claude Code or Copilot on the laptop, or
+  editing `~/.claude.json` by hand.
 - Passing build parameters with `--parameter` when their names contain spaces.
 - Installing Lavish unpinned, with install scripts, or through `npx -y`.
 - Exposing Lavish through the Coder port-share URL or a public port.
