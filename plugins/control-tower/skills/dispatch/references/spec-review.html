@@ -1,0 +1,106 @@
+<!doctype html>
+<!--
+  Spec review page for Lavish. Copy this file to <spec-dir>/spec.html and fill
+  every {{PLACEHOLDER}} from spec.md. spec.md stays the source of truth; this
+  page is only the review copy and must say exactly what spec.md says.
+
+  - Escape &, <, > and " in every filled-in value.
+  - Keep one element per bullet, criterion and row, so the user can annotate
+    each one separately.
+  - {{REVISION}} starts at 1 and goes up by one each time spec.md changes. It
+    is in the Approve button's data, so an approval names the version the
+    user saw.
+  - After a round of edits, add an entry to the revisions registry and put
+    data-lavish-revision="r<N>" on each block you changed or added, so the
+    user can see what changed. Lavish lists at most 6 rounds.
+  - Keep the page self-contained: inline styles only, no CDN, no local assets.
+-->
+<html lang="en" data-lavish-annotate="on">
+<head>
+<meta charset="utf-8">
+<title>Spec · {{WORKER_NAME}}</title>
+<script type="application/json" data-lavish-revisions>
+[]
+</script>
+<style>
+  :root { --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --accent:#0a66c2; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --bg:#ffffff; --card:#f7f7f9; }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  h1 { font-size: 22px; margin: 4px 0 10px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
+  .chip.status { background: #fff8c5; border-color: #e6d36b; color: var(--warn); }
+  main { padding: 8px 24px 32px; max-width: 880px; }
+  h2 { font-size: 15px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  p { margin: 6px 0; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; overflow-wrap: anywhere; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; table-layout: fixed; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  th { color: var(--muted); font-weight: 600; width: 140px; }
+  .decision { border-left: 3px solid var(--accent); background: var(--card); padding: 6px 10px; margin: 6px 0; border-radius: 0 6px 6px 0; }
+  .criteria { padding-left: 0; }
+  .criteria li { list-style: none; }
+  .criteria li::before { content: "☐  "; color: var(--ok); }
+  .criteria .how { display: block; color: var(--muted); font-size: 13px; margin-left: 22px; }
+  .out li::marker { content: "✕  "; color: var(--bad); }
+  .decide { margin-top: 28px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+  .decide button { margin-top: 10px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--ok); background: var(--ok); color: #fff; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">control-tower · spec for approval · revision {{REVISION}}</div>
+  <h1>{{TASK_TITLE}}</h1>
+  <div class="meta">
+    <span class="chip status">awaiting approval</span>
+    <span class="chip">task {{TASK_ID}}</span>
+    <span class="chip">worker {{WORKER_NAME}}</span>
+    <span class="chip">kind {{KIND}}</span>
+  </div>
+</header>
+<main>
+  <h2>Goal</h2>
+  <p>{{GOAL}}</p>
+
+  <h2>Context</h2>
+  <table>
+    <tr><th>Repo</th><td>{{REPO}}</td></tr>
+    <tr><th>Worktree</th><td>{{WORKTREE}}</td></tr>
+    <tr><th>Branch</th><td>{{BRANCH}}</td></tr>
+    <tr><th>Relevant files</th><td>{{FILES: one <div> per file, path in <code>, then its one-line reason}}</td></tr>
+    <tr><th>Links</th><td>{{LINKS, or None.}}</td></tr>
+  </table>
+
+  <h2>Decisions made</h2>
+  {{DECISIONS: one <div class="decision"> per decision, or <p>None.</p>}}
+
+  <h2>Acceptance criteria</h2>
+  <ul class="criteria">
+    {{CRITERIA: one <li> per criterion: the statement, then <span class="how">Check: ...</span>}}
+  </ul>
+
+  <h2>Out of scope</h2>
+  <ul class="out">
+    {{OUT_OF_SCOPE: one <li> per item, or <li>None.</li>}}
+  </ul>
+
+  <h2>Report path</h2>
+  <p><code>{{REPORT_PATH}}</code></p>
+
+  <section class="decide" data-lavish-question="approval">
+    <strong>Your decision.</strong> To change something, click it or select its
+    text, write a note, queue it, and press <em>Send to Agent</em>. To approve
+    this spec exactly as shown, use the button.
+    <div>
+      <button type="button"
+        onclick="window.lavish?.queuePrompt('APPROVED: the user approves spec revision {{REVISION}} for {{WORKER_NAME}} as shown.', { tag: 'approval', text: 'Approve spec revision {{REVISION}}', element: this, data: { question: 'approval', answer: 'approved', worker: '{{WORKER_NAME}}', revision: {{REVISION}} } }); window.lavish?.sendQueuedPrompts();">Approve revision {{REVISION}}</button>
+    </div>
+  </section>
+</main>
+</body>
+</html>

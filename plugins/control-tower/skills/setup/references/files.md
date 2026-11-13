@@ -25,8 +25,9 @@ Mode `600`. `~/.ssh/config` must contain `Include conf.d/*` **before** any
 earlier in the file would override `<coder-user>`. Create
 `~/.ssh/control/` (mode `700`) if missing.
 
-`--disable-autostart` keeps Herdr's reconnect attempts from starting a
-stopped workspace.
+herdr-app reaches the workspace through this Host: its machine connection is
+plain `ssh <ws>`. `--disable-autostart` keeps its reconnect attempts from
+starting a stopped workspace.
 
 ## Workspace
 
@@ -38,7 +39,8 @@ Append to `~/.bashrc` if absent:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Append to `~/.profile` if absent, so `systemctl --user` works over SSH:
+Append to `~/.profile` if absent, so `systemctl --user` and `loginctl` work
+over SSH:
 
 ```bash
 if [ -d "/run/user/$(id -u)" ]; then
@@ -51,7 +53,7 @@ fi
 
 Gets a fresh GitHub token from Coder external auth for each command. Tokens
 expire, so a token exported once at shell start goes stale in long-lived
-Herdr panes.
+terminals.
 
 ```bash
 #!/usr/bin/env bash
@@ -99,9 +101,10 @@ exec "$HOME/.local/bin/with-coder-github" "$HOME/.local/opt/copilot/copilot" "$@
 
 ### `~/.config/environment.d/git.conf`
 
-Gives processes started by the systemd user manager (the Herdr server and
-every pane) the same Git identity as Coder sessions. Copy the values from the
-workspace session environment (`printenv | grep '^GIT_'`):
+Gives processes started by the systemd user manager the same Git identity as
+Coder sessions, in case the hc core is ever started outside an SSH session.
+Copy the values from the workspace session environment
+(`printenv | grep '^GIT_'`):
 
 ```ini
 GIT_AUTHOR_EMAIL="<value>"
@@ -110,39 +113,98 @@ GIT_COMMITTER_EMAIL="<value>"
 GIT_COMMITTER_NAME="<value>"
 ```
 
-### `~/.config/systemd/user/herdr.service`
+### herdr-core
 
-```ini
-[Unit]
-Description=Persistent Herdr agent workspace
-StartLimitIntervalSec=0
-
-[Service]
-Type=simple
-WorkingDirectory=%h/workspace
-Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin
-Environment=CODER_AGENT_AUTH=google-instance-identity
-Environment=CODER_AGENT_URL=<coder-url>
-Environment=CODER_URL=<coder-url>
-Environment=SHELL=/bin/bash
-Environment=TERM=xterm-256color
-UMask=0077
-ExecStart=%h/.local/bin/herdr server
-Restart=always
-RestartSec=5
-TimeoutStopSec=30
-KillMode=control-group
-
-[Install]
-WantedBy=default.target
-```
-
-Create `~/workspace` first. Then:
+Installed with its own installer, which puts `herdr-core` and the `hc` link
+in `~/.local/bin`:
 
 ```bash
-sudo loginctl enable-linger "$USER"   # keep user services running without a login
-systemctl --user daemon-reload
-systemctl --user enable --now herdr.service
+curl -fsSL https://releases.herdr.dev/core/install.sh | sh
+```
+
+No service file: the core starts itself (as transient systemd user units)
+when herdr-app connects, and keeps running after logout once linger is on:
+
+```bash
+sudo loginctl enable-linger "$USER"
+```
+
+### Lavish
+
+Pinned, with npm install scripts off. The version is the one this plugin is
+tested with; raise it only after checking the new release.
+
+```bash
+LAVISH_AXI_TELEMETRY=0 npm install -g --ignore-scripts lavish-axi@0.1.96
+ln -sf "$(npm prefix -g)/bin/lavish-axi" "$HOME/.local/bin/lavish-axi"
+```
+
+Never run it through `npx -y lavish-axi`, which fetches whatever is latest.
+
+### `~/.config/control-tower/lavish.env` (mode `600`)
+
+Read by `dispatch` before every `lavish-axi` command. `<connect-host>` is the
+workspace's Coder Connect name, `<ws>.<suffix>`; the suffix is `coder` unless
+the deployment changed it (check the name Coder Desktop shows).
+
+```bash
+LAVISH_AXI_TELEMETRY=0
+LAVISH_AXI_HOST=127.0.0.1
+LAVISH_AXI_PORT=4387
+LAVISH_AXI_NO_OPEN=1
+LAVISH_AXI_DISCONNECT_GRACE_MS=off
+LAVISH_AXI_ALLOWED_HOSTS=<connect-host>
+LAVISH_AXI_LINK_HOST=<connect-host>
+```
+
+The server listens only on loopback; Coder Connect still delivers the
+laptop's requests to it. Do not use the Coder port-share URL
+(`https://4387--…`): its login proxy blocks Lavish's annotation script, and
+the only way around that, a public port, would expose an unauthenticated
+server that can read local files.
+
+### `~/.claude/statusline.sh` (only if the user wants the status line)
+
+```bash
+#!/usr/bin/env bash
+# Claude Code status line: model | cost | context % | dir
+exec python3 -I -c '
+import sys, json, os
+
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+if not isinstance(d, dict):
+    sys.exit(0)
+
+def get(o, *keys):
+    for k in keys:
+        if not isinstance(o, dict): return None
+        o = o.get(k)
+    return o
+
+parts = []
+m = get(d, "model", "display_name")
+if m: parts.append(str(m))
+
+c = get(d, "cost", "total_cost_usd")
+if isinstance(c, (int, float)): parts.append("$%.2f" % c)
+
+p = get(d, "context_window", "used_percentage")
+if isinstance(p, (int, float)): parts.append("ctx %d%%" % round(p))
+
+cwd = get(d, "workspace", "current_dir") or d.get("cwd")
+if cwd: parts.append(os.path.basename(str(cwd).rstrip("/")) or "/")
+
+print(" | ".join(parts))
+'
+```
+
+Mode `755`, and in `~/.claude/settings.json`:
+
+```json
+"statusLine": { "type": "command", "command": "bash <home>/.claude/statusline.sh" }
 ```
 
 ## Model settings copied to the workspace

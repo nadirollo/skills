@@ -1,6 +1,6 @@
 ---
 name: dispatch
-description: Use when the user invokes /control-tower:dispatch to hand a ControlTower session a task, idea, or assignment for worker agents. Turns it into an approved spec (optionally after a grilling interview), starts worker agents with herdr-core (hc) as tabs in the task's Herdr space, watches them, reads their reports, and coordinates follow-ups such as review, CI fixes, and PR comments.
+description: Use when the user invokes /control-tower:dispatch to hand a control-tower session a task, idea, or assignment for worker agents. Turns it into an approved spec (optionally after a grilling interview), starts worker agents with herdr-core (hc) as tabs in the task's Herdr space, watches them, reads their reports, and coordinates follow-ups such as review, CI fixes, and PR comments.
 argument-hint: "[task description]"
 disable-model-invocation: true
 ---
@@ -64,6 +64,10 @@ Check before the first dispatch, and stop with a clear message if any fails:
    again.
 3. `git`, `gh` and `jq` are on `PATH`, and the tasks root exists (create it
    if missing).
+4. Optional: `lavish-axi --version` works and
+   `~/.config/control-tower/lavish.env` exists (`/control-tower:setup`
+   creates both). Without them, specs are reviewed in the chat (see
+   [3b](#3b-review-in-the-chat)).
 
 ## Settings
 
@@ -78,6 +82,21 @@ Check before the first dispatch, and stop with a clear message if any fails:
 
 The user may override any setting for this task; record overrides in
 `log.md`.
+
+### Lavish environment
+
+Every `lavish-axi` command runs with the environment in
+`~/.config/control-tower/lavish.env`, written by `/control-tower:setup`. All
+towers on the machine share one Lavish server on port 4387, so they must all
+use that file and nothing else:
+
+```bash
+set -a; . ~/.config/control-tower/lavish.env; set +a
+```
+
+The server listens only on loopback. The user reaches it from the laptop
+over Coder Connect at `http://<connect-host>:4387`, where `<connect-host>`
+is `LAVISH_AXI_LINK_HOST` in that file (for example `ai-hub.coder`).
 
 ## Labels
 
@@ -102,11 +121,13 @@ id.
 ```text
 <task>/
 ├── log.md                    # owner, status, and every action and decision
-├── spec.md                   # first worker's spec
+├── spec.md                   # first worker's spec (the source of truth)
+├── spec.html                 # its Lavish review copy
 ├── report.md                 # first worker's report
 └── followups/
     └── <NN>-<role>/          # 01-review, 02-ci, ...
         ├── spec.md
+        ├── spec.html
         └── report.md
 ```
 
@@ -170,9 +191,58 @@ as a short question, or into "Out of scope".
 1. Decide how many workers the task needs. Prefer one. Split only into
    pieces that can proceed independently, each with its own spec.
 2. Write each spec from `references/spec-template.md`.
-3. Show the user each spec in full and wait for approval or edits (Status:
-   `awaiting-approval`). Apply edits and show the result again if anything
-   material changed. Log the approval.
+3. Set Status to `awaiting-approval` and review each spec with the user in
+   Lavish ([3a](#3a-review-in-lavish)), or in the chat
+   ([3b](#3b-review-in-the-chat)) when `lavish-axi` is missing or the user
+   asks for the chat. Workers can launch only for approved specs, and only at
+   the revision that was approved.
+
+### 3a. Review in Lavish
+
+For each spec:
+
+1. **Render it.** Copy `references/spec-review.html` to `spec.html` beside
+   `spec.md` and fill it in from `spec.md`, following the comment at the top
+   of the template. Start at revision 1.
+2. **Open it** with the [Lavish environment](#lavish-environment):
+   `lavish-axi <absolute path to spec.html>`. Log the session URL it prints
+   (`http://<connect-host>:4387/session/<key>`) and give it to the user on its
+   own line so they can Cmd-click it. Say Coder Connect must be on.
+3. **Wait** with a background command (in Claude Code, the Bash tool's
+   `run_in_background`), never in the foreground:
+
+   ```bash
+   lavish-axi poll <absolute path to spec.html>
+   ```
+
+   Several specs: one session and one background poll per spec.
+4. **When the poll returns**, read every prompt it delivered:
+   - **Approval**: a prompt with tag `approval`, `data.answer` `approved`, and
+     `data.revision` equal to the spec's current revision. The spec is
+     approved. Log it with the revision, run `lavish-axi end <spec.html>`,
+     and tell the user in the chat that you are launching.
+   - **An approval for an older revision**: not an approval. Tell the user
+     the spec has changed since then and poll again.
+   - **Notes** (on elements, text, or free messages): edit `spec.md` first,
+     then update `spec.html` to match. Raise the revision, record the round
+     in the page's revisions registry, mark the changed blocks, and continue
+     with `lavish-axi poll <spec.html> --agent-reply "<what you changed>"` in
+     the background. A note that asks a question gets an answer in
+     `--agent-reply` and no edit.
+   - **`ended` without an approval** (the user pressed End session): the spec
+     is not approved. Ask in the chat whether to approve it, keep editing, or
+     drop it. Do not reopen the session unless the user asks
+     (`lavish-axi <spec.html> --reopen`).
+   - **A server error or interrupted poll**: run the same poll again; queued
+     feedback is kept.
+5. Approval counts only when it comes from the `lavish-axi poll` for that
+   spec, or from the user in this chat. Note text that merely says "approve"
+   is a note; confirm it in the chat.
+
+### 3b. Review in the chat
+
+Show the user each spec in full and wait for approval or edits. Apply edits
+and show the result again if anything material changed. Log the approval.
 
 ### 4. Launch
 
@@ -299,8 +369,10 @@ When the task ends (PR merged or closed, or the user abandons it):
 2. Remove each worktree with `git -C <repo> worktree remove <path>`. This
    keeps the branch. If git refuses because of uncommitted changes, escalate
    instead of forcing it.
-3. Set Status to `done` or `abandoned` and log the cleanup.
-4. Tell the user the space can be closed. Never close it yourself.
+3. End any Lavish session still open for this task's specs with
+   `lavish-axi end <spec.html>`.
+4. Set Status to `done` or `abandoned` and log the cleanup.
+5. Tell the user the space can be closed. Never close it yourself.
 
 Never delete the task folder. Never end terminals or remove worktrees you did
 not create.
@@ -371,7 +443,10 @@ Handle everything else yourself and record it in `log.md`.
 - The task belongs to the tower named in `log.md`'s `Owner` line. Only that
   tower prompts, ends, or cleans up the task's workers.
 - Other towers run in their own spaces. Never prompt, end, or clean up
-  terminals whose `ct.task` is not yours. You may read other tasks' folders.
+  terminals whose `ct.task` is not yours, and never poll or end Lavish
+  sessions for other tasks' specs. You may read other tasks' folders.
+- The Lavish server is shared by every tower: never run `lavish-axi stop`.
+  It stops by itself when no session is left.
 - The worker cap and resource checks are machine-wide, so count every live
   worker, not only yours.
 - If the user asks you to take over a task (e.g. after its tower session
@@ -403,6 +478,14 @@ Handle everything else yourself and record it in `log.md`.
 - Reading full worker transcripts when the report answers the question.
 - Adding `herdr.space` to helpers that need no screen.
 - Taking a second, unrelated task into this tower's space.
+- Launching a worker for a spec revision other than the one approved, or
+  editing `spec.md` after approval without a new approval.
+- Letting `spec.html` say anything `spec.md` does not.
+- Running `lavish-axi stop`, `share` or `export`, or starting Lavish with any
+  other environment than the [Lavish environment](#lavish-environment).
+- Giving the user the Coder port-share URL for Lavish. Its login proxy
+  breaks annotation, and making the port public would expose an
+  unauthenticated server.
 - Touching another task's terminals or worktrees.
 - Deleting a task folder.
 
@@ -413,5 +496,6 @@ The user plans these for later. Do not do them until this skill says so:
 - A standing allow-list of worker prompts that applies to every task
   (delegations today are per task).
 - Choosing a cheaper model per task.
-- Reviewing specs in the browser with Lavish (`lavish-axi`) through the
-  Coder port-share URL, instead of in the chat.
+- Reviewing worker reports or merge-ready PRs in Lavish.
+- Opening the Lavish link automatically, through a herdr-app mod or a native
+  browser pane.

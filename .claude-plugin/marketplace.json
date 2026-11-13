@@ -4,7 +4,7 @@
     "name": "Nadir Lloret",
     "email": "nadir.lloret@fastly.com"
   },
-  "description": "Personal agent skills under test before contributing to fastly/agent-skills-internal",
+  "description": "Herdr based agentic workflow for managing and orchestrating agent tasks",
   "plugins": [
     {
       "name": "control-tower",

@@ -11,7 +11,7 @@ contexts, watches them, reads their reports, and coordinates follow-ups
 | Skill | Use |
 | --- | --- |
 | `/control-tower:dispatch [task]` | Hand a task to the tower. |
-| `/control-tower:setup [workspace]` | Set up, check or repair the Coder workspace the tower runs on. Run from your laptop. |
+| `/control-tower:setup [workspace]` | Set up, check or repair everything the tower needs: the Coder workspace (herdr-core, Claude Code, GitHub auth, Lavish) and the laptop (herdr-app, Coder Connect). Run from your laptop. |
 
 ## Flow
 
@@ -21,7 +21,9 @@ in it and run `/control-tower:dispatch`; that session is the task's tower.
 1. **Intake**: the tower works out the target repo and asks whether you want
    a grilling interview first.
 2. **Spec**: written from the grilling or straight from your description.
-   No worker starts until you approve its spec.
+   You review it in your browser with [Lavish](https://github.com/kunchenguid/lavish-axi):
+   annotate anything to change, then press Approve. No worker starts until
+   you approve its spec. Without Lavish, the review happens in the chat.
 3. **Launch**: `hc run` starts each worker agent (`claude` by default),
    named `<role>-<slug>`, in a git worktree for coding work or the repo for
    read-only work, with a fixed set of worker rules (draft PRs at most, never
@@ -44,19 +46,30 @@ Task records live in `~/workspace/control-tower/tasks/<date>-<slug>/`
 
 ## Install
 
-From GitHub (needs access to the private repo):
+1. Get the plugin on your laptop. From GitHub (needs access to the private
+   repo):
 
-```text
-/plugin install control-tower --marketplace nadirollo/skills
-```
+   ```text
+   /plugin install control-tower --marketplace nadirollo/skills
+   ```
 
-From a local checkout (e.g. on ai-hub, where the repo is synced to
-`~/workspace/skills`):
+   Or from a local checkout:
 
-```bash
-claude plugin marketplace add ~/workspace/skills
-claude plugin install control-tower@nadirollo-skills --scope user
-```
+   ```bash
+   claude plugin marketplace add <path-to-checkout>
+   claude plugin install control-tower@nadirollo-skills --scope user
+   ```
+
+2. On the laptop, run `/control-tower:setup [workspace-name]`. It creates or
+   repairs the Coder workspace, installs everything on both sides, and
+   installs the plugin on the workspace too. It is safe to re-run as a
+   repair tool.
+3. Log in where setup tells you (model provider on the workspace, Coder
+   Desktop on the laptop).
+
+Then, for each task: in herdr-app, open a new space on the workspace
+(Cmd+N while a workspace space is selected), name it, run `claude`, and
+`/control-tower:dispatch <task>`.
 
 ## Requirements
 
@@ -64,6 +77,10 @@ claude plugin install control-tower@nadirollo-skills --scope user
   should run, so the session is a herdr-core terminal (`HC_TERMINAL_ID` set).
 - herdr-core (`hc`) 0.1.21 or newer, `git`, `gh`, `jq`, and a supported agent
   CLI (`claude` by default).
+- Optional, for spec review in the browser: `lavish-axi` on the workspace
+  (tested with 0.1.96), and Coder Connect (Coder Desktop) on the laptop, so
+  `http://ai-hub.coder:4387` reaches it. Not the Coder port-share URL: its
+  login proxy breaks Lavish's annotations.
 - Linux (`/proc` is used for the capacity check).
 - `setup` runs on a macOS laptop with the `coder` CLI logged in, and targets
   Fastly's `gcp-dev-generic` Coder template.
