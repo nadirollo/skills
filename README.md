@@ -1,23 +1,9 @@
 # nadirollo/skills
 
 Personal staging area for agent skills I want to test myself before
-contributing them to `fastly/agent-skills-internal`.
+contributing widely.
 
 ## Location
-
-Cloned on the laptop at `~/workspace/ai-hub/skills`, which Coder Desktop syncs to
-`~/workspace/skills` on the `ai-hub` workspace. Run git (commit, push) from the
-laptop: ai-hub's Fastly GitHub credential cannot reach this personal repo.
-
-## Layout
-
-Mirrors `fastly/agent-skills-internal`, so a plugin can be copied over as-is:
-
-```
-.claude-plugin/marketplace.json      # lists every plugin in this repo
-plugins/<plugin>/.claude-plugin/plugin.json
-plugins/<plugin>/skills/<skill>/SKILL.md
-```
 
 ## Adding a skill
 
@@ -38,9 +24,3 @@ claude plugin install <plugin>@nadirollo-skills --scope user
 After editing a skill, run `claude plugin marketplace update nadirollo-skills`
 and `claude plugin update <plugin>@nadirollo-skills --scope user`, then start a
 new session.
-
-## Contributing to Fastly
-
-Once a skill has proven itself, copy `plugins/<plugin>/` into
-`fastly/agent-skills-internal`, follow that repo's `CONTRIBUTING.md`
-(author, versioning, changelog, checks), and open a PR there.
