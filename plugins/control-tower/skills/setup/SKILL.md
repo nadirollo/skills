@@ -217,26 +217,37 @@ the file.
    treat a trusted folder's subfolders as trusted, so trusting `/` covers
    everything. Explain it with 8.1 and apply it after the user's OK, on the
    workspace only:
-   - **Copilot:** add `/` to `trustedFolders` in `~/.copilot/config.json`
-     (`references/files.md`), keeping existing entries.
-   - **Claude Code:** let Claude record it itself; never edit
-     `~/.claude.json` by hand (every running session rewrites it). Start it
-     in `/` in a hidden hc terminal, check the screen shows its trust
-     question for `/`, choose "Yes, I trust this folder", then end it:
+   Let each harness record it itself, at its own trust question: never edit
+   `~/.claude.json` (every running Claude session rewrites it) or
+   `~/.copilot/config.json` (Copilot manages it, and it starts with comment
+   lines that `jq` cannot parse). Start both in `/` in hidden hc terminals,
+   read each screen before pressing anything, answer, then end them:
 
-     ```bash
-     hc run --bg --json --no-parent --no-notify --name ct-trust-root --cwd / claude
-     hc read ct-trust-root --lines 0      # must ask to trust "/"; read it before any key
-     hc keys ct-trust-root down enter     # "Yes, I trust this folder"
-     hc kill ct-trust-root; hc rm ct-trust-root
-     ```
+   ```bash
+   hc run --bg --json --no-parent --no-notify --name ct-trust-claude --cwd / claude
+   hc run --bg --json --no-parent --no-notify --name ct-trust-copilot --cwd / copilot
+   hc read ct-trust-claude --lines 0    # must ask to trust "/", cursor on "No, exit"
+   hc read ct-trust-copilot --lines 0   # must ask to trust "/", cursor on "1. Yes"
+   hc keys ct-trust-claude down enter   # "Yes, I trust this folder"
+   hc keys ct-trust-copilot down enter  # "2. Yes, and remember this folder for future sessions"
+   hc read ct-trust-claude --lines 0    # the question is gone (same for copilot)
+   hc kill ct-trust-claude; hc kill ct-trust-copilot
+   hc rm ct-trust-claude; hc rm ct-trust-copilot
+   ```
 
-     If it shows no question, `/` is already trusted.
+   - A harness that shows no question already trusts `/`. A screen that
+     shows anything else (a login, a different question, other options):
+     stop and show it to the user; never press keys on a guess.
+   - It is recorded as `projects["/"].hasTrustDialogAccepted: true` in
+     `~/.claude.json`, and `/` in Copilot's `trustedFolders` (`copilot help
+     config`). Read them to confirm; Copilot's file needs its leading `//`
+     lines dropped before `jq`.
    - **Verify** each: start it in a new folder outside your home
      (`mktemp -d /var/tmp/ct-trust.XXXXXX`) the same way and check no trust
-     question shows, then end it and remove the folder. If Claude still
-     asks there, trust `$HOME` and `/tmp` the same way instead and tell the
-     user that folders elsewhere will still ask.
+     question shows: Claude reaches its prompt, Copilot its input box (it
+     may still be loading MCP servers). End them and remove the folder. If
+     a harness still asks there, trust `$HOME` and `/tmp` the same way
+     instead and tell the user that folders elsewhere will still ask.
 3. **Preferences.** Ask about each; apply only what the user says yes to:
 
    - **Status line** with model, session cost, context use and folder:

@@ -6,6 +6,16 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.1] - 2026-11-13
+
+### Fixed
+
+- `setup` step 8.2: Copilot's folder trust for `/` is now given at
+  Copilot's own trust prompt ("Yes, and remember this folder"), like
+  Claude Code's, instead of editing `~/.copilot/config.json` with `jq`,
+  which fails on that file's leading comment lines and which Copilot
+  manages itself.
+
 ## [0.5.0] - 2026-11-13
 
 ### Added
