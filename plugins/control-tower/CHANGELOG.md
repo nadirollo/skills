@@ -6,6 +6,14 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.1] - 2026-11-13
+
+### Changed
+
+- `dispatch`: workers no longer get the `herdr.space` label, so they do not
+  open tabs in the task's space. They stay visible under the tower in
+  herdr-app's agents panel, as its hc children.
+
 ## [0.4.0] - 2026-11-13
 
 ### Added

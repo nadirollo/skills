@@ -31,8 +31,8 @@ Workspace name from the user: $ARGUMENTS
 How the pieces fit: herdr-app on the laptop shows spaces, tabs and terminals;
 herdr-core on the workspace runs them. The user opens one herdr-app space per
 task on the workspace and runs `/control-tower:dispatch` in it. Workers
-appear as tabs in that space. Specs are reviewed in the laptop's browser
-through Lavish over Coder Connect.
+appear under the tower in herdr-app's agents panel, not as tabs. Specs are
+reviewed in the laptop's browser through Lavish over Coder Connect.
 
 ## Ground rules
 

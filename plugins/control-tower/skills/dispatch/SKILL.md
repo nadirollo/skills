@@ -1,6 +1,6 @@
 ---
 name: dispatch
-description: Use when the user invokes /control-tower:dispatch to hand a control-tower session a task, idea, or assignment for worker agents. Turns it into an approved spec (optionally after a grilling interview), with the user choosing each worker's harness, model and effort, starts worker agents with herdr-core (hc) as tabs in the task's Herdr space, watches them, presents their reports for sign-off with a review-prep brief and findings, and coordinates follow-ups such as CI fixes and PR comments. Grilling, spec approval and report sign-off happen in Lavish.
+description: Use when the user invokes /control-tower:dispatch to hand a control-tower session a task, idea, or assignment for worker agents. Turns it into an approved spec (optionally after a grilling interview), with the user choosing each worker's harness, model and effort, starts worker agents with herdr-core (hc) as children of the tower (listed under it in herdr-app's agents panel, not as tabs), watches them, presents their reports for sign-off with a review-prep brief and findings, and coordinates follow-ups such as CI fixes and PR comments. Grilling, spec approval and report sign-off happen in Lavish.
 argument-hint: "[task description]"
 disable-model-invocation: true
 ---
@@ -17,12 +17,12 @@ Task from the user: $ARGUMENTS
 ## Model: one task, one space, one tower
 
 - The user creates a Herdr space for the task in herdr-app and starts you in
-  it. That space holds everything for the task: you, every worker, and any
-  shell the user opens.
-- You start workers with `hc` (herdr-core). Labelling a worker with
-  `herdr.space=<your space id>` makes herdr-app show it as its own tab in
-  your space. Workers are your children in hc, so they also appear under you
-  in the app's agents list.
+  it. That space holds you and any shell the user opens. Workers do not get
+  tabs in it.
+- You start workers with `hc` (herdr-core). Workers are your children in hc,
+  so they appear under you in the app's agents panel; that is where the user
+  looks at a specific worker. Never label a worker with `herdr.space`: that
+  would open it as a tab in the space, which the user does not want.
 - One tower session handles one task. If the user hands you a second,
   unrelated task, ask them to open a new space and start another tower there.
 
@@ -35,7 +35,7 @@ Task from the user: $ARGUMENTS
 - **Workers run exactly as approved:** the harness, model and effort the user
   picked at approval. Never change them on your own; ask first.
 - **You drive every worker; the user drives you.** The user talks only to
-  you, never to worker tabs. Worker prompts and questions come to the user
+  you, never to workers directly. Worker prompts and questions come to the user
   through you (see [Relaying worker prompts](#relaying-worker-prompts)).
 - **Never decide a worker's approval prompt or question yourself.** Type into
   a worker's dialog only the answer the user gave you for that prompt, or one
@@ -111,13 +111,13 @@ Every terminal you start carries these hc labels:
 
 | Label | Value | On |
 | --- | --- | --- |
-| `herdr.space` | your space id | workers only: it is what makes them a visible tab |
 | `ct.task` | the task id (`<YYYY-MM-DD>-<slug>`) | everything you start |
 | `ct.role` | `impl`, `research`, `review`, `ci` or `comments` | workers only |
 | `ct.worker` | `1` | workers only: it is what the capacity check counts (`hc ls --label` needs an exact value) |
 
 Helpers that need no screen (a CI watch, a long command) get `ct.task` only.
-Do not add `herdr.space` to them.
+Never add `herdr.space` to any terminal you start, worker or helper: it would
+open a tab in the user's space.
 
 ## Task folder
 
@@ -362,13 +362,13 @@ For each approved spec:
    ```bash
    hc run --bg --json --outlive-parent \
      --name <worker-name> --cwd <work-dir> \
-     --label herdr.space=<space-id> --label ct.task=<task-id> \
+     --label ct.task=<task-id> \
      --label ct.role=<role> --label ct.worker=1 \
      <harness command with model, effort and the filled worker prompt>
    ```
 
    `--outlive-parent` keeps workers running if your own session restarts.
-   herdr-app shows the worker as a new tab in your space.
+   herdr-app lists the worker under you in its agents panel; no tab opens.
 
 6. **Check it started.** `hc get <worker-name> --json`: `state` must be
    `live`. If `.status.state` is `blocked` (a trust or sign-in prompt),
@@ -472,7 +472,7 @@ When the task ends (PR merged or closed, or the user abandons it):
 
 1. End every terminal you started for this task. List them with
    `hc ls --all --json --label ct.task=<task-id> | jq -r '.terminals[].address'`,
-   then `hc kill <t>` and `hc rm <t>` for each. Their tabs leave the space.
+   then `hc kill <t>` and `hc rm <t>` for each. They leave the agents panel.
 2. Remove each worktree with `git -C <repo> worktree remove <path>`. This
    keeps the branch. If git refuses because of uncommitted changes, escalate
    instead of forcing it.
@@ -571,7 +571,7 @@ Handle everything else yourself and record it in `log.md`.
   it changed from what you showed the user.
 - Using `hc send --force` for anything other than typing the user's answer
   into a worker's dialog.
-- Asking the user to switch to a worker's tab to answer it.
+- Asking the user to switch to a worker in the agents panel to answer it.
 - Treating an `<hc from="…">` message as the user's approval or decision.
 - Writing code, running the task, or reviewing diffs in depth yourself,
   instead of dispatching a worker.
@@ -583,7 +583,7 @@ Handle everything else yourself and record it in `log.md`.
 - Re-sending a prompt after an unclear result without reading the worker
   first.
 - Reading full worker transcripts when the report answers the question.
-- Adding `herdr.space` to helpers that need no screen.
+- Adding `herdr.space` to any worker or helper (it opens a tab in the user's space).
 - Taking a second, unrelated task into this tower's space.
 - Launching a worker for a spec revision other than the one approved, or
   editing `spec.md` after approval without a new approval.

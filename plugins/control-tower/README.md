@@ -31,8 +31,8 @@ in it and run `/control-tower:dispatch`; that session is the task's tower.
 3. **Launch**: `hc run` starts each worker agent with the harness, model and effort you picked,
    named `<role>-<slug>`, in a git worktree for coding work or the repo for
    read-only work, with a fixed set of worker rules (draft PRs at most, never
-   merge or release). A `herdr.space` label makes each worker a tab in the
-   task's space.
+   merge or release). Workers are the tower's hc children: herdr-app lists
+   them under the tower in its agents panel, without opening tabs.
 4. **Watch**: a background `hc wait --children any`; workers report with
    `hc send`, and the tower reads each worker's `report.md`.
 5. **Sign-off**: when a worker is done, the tower presents its report in
