@@ -1,6 +1,6 @@
 ---
 name: dispatch
-description: Use when the user invokes /control-tower:dispatch to hand a control-tower session a task, idea, or assignment for worker agents. Turns it into an approved spec (optionally after a grilling interview), starts worker agents with herdr-core (hc) as tabs in the task's Herdr space, watches them, reads their reports, and coordinates follow-ups such as review, CI fixes, and PR comments.
+description: Use when the user invokes /control-tower:dispatch to hand a control-tower session a task, idea, or assignment for worker agents. Turns it into an approved spec (optionally after a grilling interview), with the user choosing each worker's harness, model and effort, starts worker agents with herdr-core (hc) as tabs in the task's Herdr space, watches them, presents their reports for sign-off with a review-prep brief and findings, and coordinates follow-ups such as CI fixes and PR comments. Grilling, spec approval and report sign-off happen in Lavish.
 argument-hint: "[task description]"
 disable-model-invocation: true
 ---
@@ -29,7 +29,11 @@ Task from the user: $ARGUMENTS
 ## Ground rules
 
 - **No worker starts until the user has seen and approved its spec.** This
-  applies to every worker, including follow-ups.
+  applies to every worker, including follow-ups. The one exception is the
+  review prep of `references/review-prep.md`: three read-only workers with
+  fixed specs, covered by the approval that chose it.
+- **Workers run exactly as approved:** the harness, model and effort the user
+  picked at approval. Never change them on your own; ask first.
 - **You drive every worker; the user drives you.** The user talks only to
   you, never to worker tabs. Worker prompts and questions come to the user
   through you (see [Relaying worker prompts](#relaying-worker-prompts)).
@@ -66,8 +70,10 @@ Check before the first dispatch, and stop with a clear message if any fails:
    if missing).
 4. Optional: `lavish-axi --version` works and
    `~/.config/control-tower/lavish.env` exists (`/control-tower:setup`
-   creates both). Without them, specs are reviewed in the chat (see
-   [3b](#3b-review-in-the-chat)).
+   creates both). Without them, grilling, spec review and report sign-off
+   happen in the chat (see [Without Lavish](#without-lavish)).
+5. Note which harnesses from `references/harnesses.md` are installed
+   (`command -v claude copilot ...`). Only those are offered.
 
 ## Settings
 
@@ -75,7 +81,8 @@ Check before the first dispatch, and stop with a clear message if any fails:
 | --- | --- |
 | Tasks root | `~/workspace/control-tower/tasks` |
 | Worktree root | `~/.herdr/worktrees/<repo>/<branch with / as ->` (herdr-app's own layout) |
-| Default worker kind | `claude`, unless the user names another |
+| Default worker harness, model, effort | `claude`, `default`, `default` (preselected on the spec page; the user picks) |
+| Default reviewer harness, model, effort (review prep) | `claude`, `opus`, `high` |
 | Max concurrent workers (machine-wide) | 8 |
 | Minimum available memory to start a worker | 4096 MB |
 | Maximum 5-minute load average to start a worker | 8 |
@@ -121,14 +128,19 @@ id.
 ```text
 <task>/
 ├── log.md                    # owner, status, and every action and decision
+├── grilling.html             # the grilling, if chosen (Lavish)
 ├── spec.md                   # first worker's spec (the source of truth)
 ├── spec.html                 # its Lavish review copy
 ├── report.md                 # first worker's report
+├── report.html               # its Lavish sign-off page
 └── followups/
-    └── <NN>-<role>/          # 01-review, 02-ci, ...
+    ├── <NN>-review-prep/     # spec-<role>.md, findings-correctness.md,
+    │                         # findings-leanness.md, brief.md
+    └── <NN>-<role>/          # 02-ci, 03-comments, ...
         ├── spec.md
         ├── spec.html
-        └── report.md
+        ├── report.md
+        └── report.html
 ```
 
 The task folder is permanent: never delete it, even after cleanup.
@@ -176,9 +188,45 @@ where the task stands.
 
 ### 2a. Grill (if chosen)
 
-Set Status to `grilling`. Follow `references/grilling.md` until the frontier
-is empty and the user confirms the shared understanding. Every settled
-decision becomes a bullet in the spec's "Decisions made".
+Set Status to `grilling`. Follow `references/grilling.md` for **what** to ask
+(the design tree, rounds, the frontier, recommended answers, finding facts
+yourself) until the frontier is empty and the user confirms the shared
+understanding. Every settled decision becomes a bullet in the spec's
+"Decisions made".
+
+**How** to ask: in Lavish, not in the chat (in the chat only
+[without Lavish](#without-lavish)). The user reads each question on its own
+card and answers them one by one before sending the round:
+
+1. Copy `references/grilling-round.html` to `<task>/grilling.html` and fill
+   its JSON block with round 1, following the comment at the top. Each
+   question keeps the grilling format's parts: title, body, choices if any,
+   and your recommended answer worded so "yes" accepts it.
+2. Open it with the [Lavish environment](#lavish-environment):
+   `lavish-axi <absolute path to grilling.html>`. Give the user the session
+   URL on its own line, and say Coder Connect must be on.
+3. Wait with `lavish-axi poll <grilling.html>` as a background command, as
+   for specs ([3a](#3a-review-in-lavish), step 3).
+4. A `grill-round` prompt carries `data.items`, one per answered question.
+   Account for every id:
+   - `accept`: settled as your recommendation; `choice`: settled as the named
+     option; `own`: settled as the user's text. A `text` on accept or choice
+     is a note to fold into the decision.
+   - `ask`: not settled. Answer the question or reword it: set its `reply`,
+     or change its title/body/recommendation, keeping its id.
+   - Questions not in `data.items` stay on the frontier.
+5. Recompute the frontier. Rewrite the JSON: move settled decisions to
+   `settled` (phrased as rules), and put the new frontier, plus any `ask`
+   questions and unanswered ones, in `questions`. Raise `round` when the
+   frontier moved, otherwise only `revision`. Say what changed in
+   `agent_note`. Then poll again with `--agent-reply "<one line>"`.
+6. When the frontier is empty, set `mode` to `"confirm"` with every settled
+   decision. A `grill-confirm` prompt with `data.answer` `confirmed` ends the
+   grilling: log it, run `lavish-axi end <grilling.html>`, and draft the
+   spec. `changes` means its notes go back into the tree as a new round.
+7. Look up facts while the user answers: a running lookup only holds back
+   the questions that depend on it. Answers count only from that page's
+   poll or from this chat, as for specs.
 
 ### 2b. Draft from the description (if grilling is skipped)
 
@@ -196,6 +244,10 @@ as a short question, or into "Out of scope".
    ([3b](#3b-review-in-the-chat)) when `lavish-axi` is missing or the user
    asks for the chat. Workers can launch only for approved specs, and only at
    the revision that was approved.
+4. With the approval the user also picks how the worker runs: its harness,
+   model and effort, and whether a review prep follows it (with the
+   reviewers' harness, model and effort). These are not part of `spec.md`:
+   changing them does not need a new revision.
 
 ### 3a. Review in Lavish
 
@@ -203,7 +255,10 @@ For each spec:
 
 1. **Render it.** Copy `references/spec-review.html` to `spec.html` beside
    `spec.md` and fill it in from `spec.md`, following the comment at the top
-   of the template. Start at revision 1.
+   of the template. Start at revision 1. Fill its harness data from
+   `references/harnesses.md`: installed harnesses only, with the task's
+   defaults preselected. Check review prep by default when the worker
+   changes code.
 2. **Open it** with the [Lavish environment](#lavish-environment):
    `lavish-axi <absolute path to spec.html>`. Log the session URL it prints
    (`http://<connect-host>:4387/session/<key>`) and give it to the user on its
@@ -219,8 +274,13 @@ For each spec:
 4. **When the poll returns**, read every prompt it delivered:
    - **Approval**: a prompt with tag `approval`, `data.answer` `approved`, and
      `data.revision` equal to the spec's current revision. The spec is
-     approved. Log it with the revision, run `lavish-axi end <spec.html>`,
-     and tell the user in the chat that you are launching.
+     approved. `data.run` is the worker's `{harness, model, effort}`;
+     `data.review_prep` and `data.reviewer` say whether review prep follows
+     and how its reviewers run. Validate them against
+     `references/harnesses.md`; if any value fails, the spec is still
+     approved but ask in the chat for the run settings. Log the approval with
+     the revision and the run settings, run `lavish-axi end <spec.html>`, and
+     tell the user in the chat that you are launching, and how.
    - **An approval for an older revision**: not an approval. Tell the user
      the spec has changed since then and poll again.
    - **Notes** (on elements, text, or free messages): edit `spec.md` first,
@@ -242,7 +302,20 @@ For each spec:
 ### 3b. Review in the chat
 
 Show the user each spec in full and wait for approval or edits. Apply edits
-and show the result again if anything material changed. Log the approval.
+and show the result again if anything material changed. With the approval,
+ask for the worker's harness, model and effort, and whether to run review
+prep (with `AskUserQuestion` if available: options from
+`references/harnesses.md`, the defaults first). Log the approval and the run
+settings.
+
+### Without Lavish
+
+When `lavish-axi` or `lavish.env` is missing, or the user asks for the chat:
+grill in the chat with the round format in `references/grilling.md`; review
+specs as in [3b](#3b-review-in-the-chat); and present reports as the same
+sections `report-review.html` has (summary, criteria and evidence, brief,
+findings by severity, questions before sign-off), asking for the next step in
+the chat.
 
 ### 4. Launch
 
@@ -283,14 +356,15 @@ For each approved spec:
 5. **Start the worker** with its prompt in the same command, so the prompt
    cannot be dropped while the agent boots. Fill in
    `references/worker-prompt.md` (spec path, working directory, report path,
-   and your `$HC_TERMINAL_ID` as the tower address):
+   and your `$HC_TERMINAL_ID` as the tower address). Build the agent part
+   from the approved run settings as `references/harnesses.md` says:
 
    ```bash
    hc run --bg --json --outlive-parent \
      --name <worker-name> --cwd <work-dir> \
      --label herdr.space=<space-id> --label ct.task=<task-id> \
      --label ct.role=<role> --label ct.worker=1 \
-     <kind> "<filled worker prompt>"
+     <harness command with model, effort and the filled worker prompt>
    ```
 
    `--outlive-parent` keeps workers running if your own session restarts.
@@ -312,8 +386,8 @@ For each approved spec:
    tells you itself when a worker blocks, errors or exits: those arrive as
    `<hc from="…">` messages.
 
-8. Log the launch (worker name, hc address, working directory, branch) and
-   set Status to `running`.
+8. Log the launch (worker name, hc address, working directory, branch,
+   harness, model, effort) and set Status to `running`.
 
 ### 5. When a worker needs attention
 
@@ -335,13 +409,45 @@ message. Then:
      (`hc send <worker-name> "<instruction>"`). If that fails too, treat the
      outcome as `failed`.
    - `done`: check the evidence against the spec's acceptance criteria
-     yourself. Do not trust a claim with no evidence.
-   - `blocked` or `failed`: decide whether a follow-up spec can fix it, or
-     whether the user must decide.
+     yourself. Do not trust a claim with no evidence. If its approval chose
+     review prep and the worker changed code, launch the review prep
+     (`references/review-prep.md`) and present the report when it is in;
+     otherwise present the report now ([5a](#5a-report-sign-off-in-lavish)).
+   - `blocked` or `failed`: present the report too, with the decision you
+     propose, unless a follow-up only needs a quick question in the chat.
 6. Before sending anything again after an unclear result, read the worker
    first: a message may have arrived even when a command reported failure.
 7. Log the result and tell the user briefly: outcome, PR link, and what you
    propose next. Restart the background wait while any worker is live.
+
+### 5a. Report sign-off in Lavish
+
+1. **Build** `report.html` beside the worker's `report.md` from
+   `references/report-review.html`, following the comment at its top. With
+   review prep, assemble it as `references/review-prep.md` says: the brief
+   first, then findings by severity, then the questions before sign-off. You
+   assemble; you do not review the diff yourself.
+2. **Open** it with the [Lavish environment](#lavish-environment), give the
+   user the URL on its own line, and poll in the background, as for specs.
+3. **Notes** on the page (a claim, a finding, a question) correct or clarify
+   the page only, never the code: answer with `--agent-reply`, or fix the
+   page, raise its revision and poll again. If a note needs a fact, look it
+   up or ask the reviewer who wrote it (`hc send`) while it is still live.
+4. A **`report-decision`** prompt ends the review. Account for every finding
+   id in `data.items` and every answer in `data.answers`, and log them. Then
+   act on `data.next`:
+   - `signed-off`: tell the user the task is ready for them to merge, if it
+     has a PR; never merge. Clean up when they say it is merged or done.
+   - `follow-up`: draft one follow-up spec from the findings marked `fix`,
+     the user's answers and note, and get it approved like any spec.
+   - `ci-or-comments`: the matching follow-up from [6](#6-follow-ups).
+   - `abandon`: [cleanup](#7-cleanup).
+   - `other`: do what the note says, within these rules; ask if unclear.
+   Findings marked `discuss` go to the user in the chat before the
+   follow-up spec is drafted.
+5. Run `lavish-axi end <report.html>` once the decision is logged. When the
+   review-prep reviewers are done, remove their terminals (`hc kill`,
+   `hc rm`).
 
 ### 6. Follow-ups
 
@@ -351,10 +457,11 @@ into the same space.
 
 | Situation | Follow-up |
 | --- | --- |
-| Draft PR opened | `review` worker: a fresh session with only the spec, the acceptance criteria, and the diff (`gh pr diff`). Use the `coding:code-review` skill if installed. |
+| Worker done with a code change, review prep chosen | The three review-prep workers of `references/review-prep.md`, covered by the original approval; then [5a](#5a-report-sign-off-in-lavish). |
+| Draft PR opened, review prep not chosen, user asks for a review | `review` worker with its own approved spec: only the spec, the acceptance criteria, and the diff (`gh pr diff`). Use the `coding:code-review` skill if installed. |
 | CI failing | Watch it with a helper: `hc run --bg --name ci-watch-<slug> --label ct.task=<task-id> -- gh pr checks <pr> --watch`. Its exit reaches you through the background wait. On failure, a `ci` worker gets the failing check names, the decisive log lines, and the branch. Remove the helper afterwards (`hc rm`). |
 | PR review comments | Fetch them with `gh`. A `comments` worker gets those comments and the branch, nothing else. |
-| Review or CI found nothing, PR ready | Escalate for merge approval. |
+| Signed off on the report page, PR ready | Tell the user it is ready for them to merge. |
 
 Follow-ups for code changes reuse the task's existing worktree and branch,
 unless two workers would edit it at the same time.
@@ -369,8 +476,8 @@ When the task ends (PR merged or closed, or the user abandons it):
 2. Remove each worktree with `git -C <repo> worktree remove <path>`. This
    keeps the branch. If git refuses because of uncommitted changes, escalate
    instead of forcing it.
-3. End any Lavish session still open for this task's specs with
-   `lavish-axi end <spec.html>`.
+3. End any Lavish session still open for this task (grilling, specs,
+   reports) with `lavish-axi end <file>`.
 4. Set Status to `done` or `abandoned` and log the cleanup.
 5. Tell the user the space can be closed. Never close it yourself.
 
@@ -480,7 +587,15 @@ Handle everything else yourself and record it in `log.md`.
 - Taking a second, unrelated task into this tower's space.
 - Launching a worker for a spec revision other than the one approved, or
   editing `spec.md` after approval without a new approval.
+- Taking run settings (harness, model, effort) from a note, or launching
+  with values that failed the checks in `references/harnesses.md`.
+- Reviewing the diff yourself to fill the report page, or saying anything on
+  it that the report and review-prep outputs do not say.
+- Changing code because of a note on the report page: notes change the page;
+  code changes need a follow-up spec.
 - Letting `spec.html` say anything `spec.md` does not.
+- Asking grilling questions in the chat when Lavish is available, or
+  settling a question the user marked `ask`.
 - Running `lavish-axi stop`, `share` or `export`, or starting Lavish with any
   other environment than the [Lavish environment](#lavish-environment).
 - Giving the user the Coder port-share URL for Lavish. Its login proxy
@@ -495,7 +610,6 @@ The user plans these for later. Do not do them until this skill says so:
 
 - A standing allow-list of worker prompts that applies to every task
   (delegations today are per task).
-- Choosing a cheaper model per task.
-- Reviewing worker reports or merge-ready PRs in Lavish.
+- Approving merges from the report page.
 - Opening the Lavish link automatically, through a herdr-app mod or a native
   browser pane.

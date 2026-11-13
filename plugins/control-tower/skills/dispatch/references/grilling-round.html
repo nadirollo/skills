@@ -1,0 +1,225 @@
+<!doctype html>
+<!--
+  Grilling page for Lavish. Copy this file to <task>/grilling.html once, at
+  the start of the grilling, and rewrite only the JSON block below for every
+  round and revision. The page renders everything from that JSON.
+
+  Fill {{ROUND_JSON}} with one JSON object, and replace every "</" in it with
+  "<\/":
+
+  {
+    "task": "<task id>",
+    "title": "<task title>",
+    "round": 1,                 // goes up by one per round
+    "revision": 1,              // goes up by one each time this round's questions change
+    "mode": "questions",        // or "confirm" once the frontier is empty
+    "agent_note": "",           // optional: what you changed since the last revision, shown at the top
+    "settled": [                // every decision settled so far, oldest first
+      { "id": "Q1.2", "title": "<question title>", "decision": "<the decision, phrased as a rule>" }
+    ],
+    "questions": [              // the frontier (mode "questions" only)
+      { "id": "Q2.1",           // Q<round>.<n>; a reworded question keeps its id
+        "title": "<question title>",
+        "body": "<question body; blank lines separate paragraphs>",
+        "choices": ["<option>", "<option>"],   // optional
+        "recommended": "<your recommended answer>",
+        "reply": "" }           // optional: your answer to the user's question about it
+    ]
+  }
+
+  Plain text only in every value: the page escapes it. Keep it
+  self-contained: inline styles and script only, no CDN, no local assets.
+-->
+<html lang="en" data-lavish-annotate="off">
+<head>
+<meta charset="utf-8">
+<title>Grilling</title>
+<script type="application/json" id="ct-round">
+{{ROUND_JSON}}
+</script>
+<style>
+  :root { --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --accent:#0a66c2; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --bg:#ffffff; --card:#f7f7f9; }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  h1 { font-size: 22px; margin: 4px 0 8px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .progress { flex: 1 1 200px; min-width: 0; height: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--ok); transition: width .2s; }
+  .count { font-size: 13px; color: var(--muted); }
+  main { padding: 8px 24px 40px; max-width: 880px; }
+  .note { margin: 14px 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--card); border-radius: 0 6px 6px 0; }
+  details.settled { margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  details.settled summary { cursor: pointer; font-weight: 600; }
+  .settled li { margin: 4px 0; overflow-wrap: anywhere; }
+  .settled .id { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .q { border: 1px solid var(--line); border-radius: 10px; margin: 16px 0; padding: 14px 16px; }
+  .q.done { border-color: #a7d8b4; }
+  .q.ask { border-color: #e6d36b; }
+  .q h2 { font-size: 16px; margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .q h2 .id { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .q h2 .state { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); }
+  .q .body p { margin: 6px 0; overflow-wrap: anywhere; }
+  .rec { margin: 10px 0; padding: 8px 10px; background: #eef6ff; border: 1px solid #c8def5; border-radius: 6px; overflow-wrap: anywhere; }
+  .rec b { color: var(--accent); }
+  .reply { margin: 10px 0; padding: 8px 10px; background: #fff8c5; border: 1px solid #e6d36b; border-radius: 6px; overflow-wrap: anywhere; }
+  .opts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .opts label { display: flex; gap: 8px; align-items: flex-start; padding: 4px 6px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; min-width: 0; }
+  .opts label:hover { background: var(--card); }
+  textarea { width: 100%; min-height: 64px; font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; resize: vertical; }
+  textarea[hidden] { display: none; }
+  .submit { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--line); margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); cursor: pointer; }
+  button.primary { border-color: var(--ok); background: var(--ok); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .decision { border-left: 3px solid var(--accent); background: var(--card); padding: 6px 10px; margin: 6px 0; border-radius: 0 6px 6px 0; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow" id="ct-eyebrow">control-tower · grilling</div>
+  <h1 id="ct-title">Grilling</h1>
+  <div class="bar"><div class="progress"><div id="ct-progress"></div></div><span class="count" id="ct-count"></span></div>
+</header>
+<main id="ct-main"></main>
+<script>
+(() => {
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else if (v !== false && v != null) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const k of kids) if (k != null) n.append(k);
+    return n;
+  };
+  const paras = (text) => String(text || '').split(/\n\s*\n/).filter((t) => t.trim()).map((t) => el('p', { text: t.trim() }));
+  const main = document.getElementById('ct-main');
+  let R;
+  try { R = JSON.parse(document.getElementById('ct-round').textContent); }
+  catch (e) { main.append(el('p', { text: 'This page has no valid round data. Answer in the chat instead.' })); return; }
+  const qs = R.questions || [];
+  const key = 'ct-grill:' + R.task + ':' + R.round;
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } })();
+  const save = (st) => { try { localStorage.setItem(key, JSON.stringify(st)); } catch (e) {} };
+  const state = {};
+  for (const q of qs) state[q.id] = saved[q.id] || { answer: '', choice: '', text: '' };
+
+  document.title = 'Grilling · round ' + R.round + ' · ' + (R.title || R.task);
+  document.getElementById('ct-title').textContent = R.title || R.task;
+  document.getElementById('ct-eyebrow').textContent = 'control-tower · grilling · task ' + R.task + ' · round ' + R.round + (R.revision > 1 ? ' · revision ' + R.revision : '');
+  if (R.agent_note) main.append(el('div', { class: 'note', text: R.agent_note }));
+
+  const settled = R.settled || [];
+  if (settled.length) {
+    main.append(el('details', { class: 'settled', open: R.mode === 'confirm' },
+      el('summary', { text: 'Settled so far (' + settled.length + ')' }),
+      el('ul', {}, ...settled.map((d) => el('li', {}, el('span', { class: 'id', text: d.id + ' ' }), el('b', { text: d.title + ': ' }), d.decision)))));
+  }
+
+  const progress = () => {
+    const done = qs.filter((q) => { const s = state[q.id]; return s.answer && (s.answer === 'accept' || (s.answer === 'choice' && s.choice) || s.text.trim()); }).length;
+    document.getElementById('ct-progress').style.width = (qs.length ? 100 * done / qs.length : 100) + '%';
+    document.getElementById('ct-count').textContent = R.mode === 'confirm' ? 'Frontier empty' : done + ' of ' + qs.length + ' answered';
+    return done;
+  };
+
+  if (R.mode === 'confirm') {
+    main.append(el('h2', { text: 'Is this the shared understanding?' }));
+    main.append(el('p', { class: 'hint', text: 'Every decision below goes into the spec as a rule the worker must follow.' }));
+    for (const d of settled) main.append(el('div', { class: 'decision' }, el('b', { text: d.title + ': ' }), d.decision));
+    const notes = el('textarea', { placeholder: 'Anything missing or wrong? Leave empty to confirm as is.' });
+    const send = (confirmed) => {
+      const text = notes.value.trim();
+      if (!confirmed && !text) { notes.focus(); return; }
+      window.lavish?.queuePrompt(confirmed ? 'CONFIRMED: the user confirms the shared understanding for round ' + R.round + '.' + (text ? ' Notes: ' + text : '') : 'NOT YET: the user wants changes before confirming: ' + text, {
+        tag: 'grill-confirm', text: confirmed ? 'Confirm shared understanding' : 'Not yet: ' + text, element: main, queueKey: 'grill-confirm',
+        data: { question: 'grill-confirm', answer: confirmed ? 'confirmed' : 'changes', round: R.round, revision: R.revision, notes: text },
+      });
+      window.lavish?.sendQueuedPrompts();
+    };
+    main.append(notes, el('div', { class: 'submit' },
+      Object.assign(el('button', { type: 'button', class: 'primary', text: 'Confirm and write the spec' }), { onclick: () => send(true) }),
+      Object.assign(el('button', { type: 'button', text: 'Not yet: send my notes' }), { onclick: () => send(false) })));
+    progress();
+    return;
+  }
+
+  const cards = {};
+  for (const q of qs) {
+    const s = state[q.id];
+    const name = 'a-' + q.id;
+    const stateLabel = el('span', { class: 'state' });
+    const text = el('textarea', { placeholder: '' });
+    text.value = s.text;
+    const opt = (value, label, extra = {}) => {
+      const input = el('input', { type: 'radio', name, value, ...extra });
+      return { input, label: el('label', {}, input, el('span', {}, ...[].concat(label))) };
+    };
+    const options = [opt('accept', [el('b', { text: 'Yes' }), ' — accept the recommendation'])];
+    (q.choices || []).forEach((c, i) => options.push(opt('choice', c, { 'data-choice': c, id: name + '-c' + i })));
+    options.push(opt('own', 'My own answer'));
+    options.push(opt('ask', 'Not yet — I have a question or want it reworded'));
+    for (const o of options) {
+      if (o.input.value === s.answer && (s.answer !== 'choice' || o.input.dataset.choice === s.choice)) o.input.checked = true;
+    }
+    const card = el('section', { class: 'q', id: q.id },
+      el('h2', {}, el('span', { class: 'id', text: q.id }), q.title, stateLabel),
+      el('div', { class: 'body' }, ...paras(q.body)),
+      el('div', { class: 'rec' }, el('b', { text: 'Recommended: ' }), q.recommended || ''),
+      q.reply ? el('div', { class: 'reply' }, el('b', { text: 'Tower: ' }), q.reply) : null,
+      el('div', { class: 'opts', role: 'radiogroup', 'aria-label': q.title }, ...options.map((o) => o.label)),
+      text);
+    const update = () => {
+      const picked = options.find((o) => o.input.checked);
+      s.answer = picked ? picked.input.value : '';
+      s.choice = picked && s.answer === 'choice' ? picked.input.dataset.choice : '';
+      s.text = text.value;
+      text.hidden = !s.answer;
+      text.placeholder = s.answer === 'own' ? 'Your answer (required)' : s.answer === 'ask' ? 'Your question, or how to reword it (required)' : 'Optional note';
+      const complete = s.answer === 'accept' || (s.answer === 'choice' && s.choice) || (s.answer && s.text.trim());
+      card.classList.toggle('done', !!complete && s.answer !== 'ask');
+      card.classList.toggle('ask', s.answer === 'ask');
+      stateLabel.textContent = !s.answer ? 'unanswered' : !complete ? 'needs text' : s.answer === 'ask' ? 'question' : 'answered';
+      save(state);
+      refresh();
+    };
+    for (const o of options) o.input.addEventListener('change', update);
+    text.addEventListener('input', update);
+    cards[q.id] = update;
+    main.append(card);
+  }
+
+  const status = el('span', { class: 'hint', role: 'status', 'aria-live': 'polite' });
+  const submit = el('button', { type: 'button', class: 'primary', text: 'Send answers' });
+  const acceptRest = el('button', { type: 'button', text: 'Accept every unanswered recommendation' });
+  main.append(el('div', { class: 'submit' }, submit, acceptRest, status));
+  function refresh() {
+    const done = progress();
+    const open = qs.length - done;
+    submit.disabled = done === 0;
+    status.textContent = done === 0 ? 'Answer at least one question.' : open ? open + ' left unanswered: they come back next round.' : 'All answered.';
+  }
+  acceptRest.onclick = () => {
+    for (const q of qs) if (!state[q.id].answer) { const r = document.querySelector('input[name="a-' + CSS.escape(q.id) + '"][value="accept"]'); r.checked = true; cards[q.id](); }
+  };
+  submit.onclick = () => {
+    const items = qs.map((q) => ({ id: q.id, title: q.title, ...state[q.id] }))
+      .filter((s) => s.answer === 'accept' || (s.answer === 'choice' && s.choice) || (s.answer && s.text.trim()))
+      .map((s) => ({ id: s.id, title: s.title, answer: s.answer, choice: s.choice || undefined, text: s.text.trim() || undefined }));
+    if (!items.length) return;
+    window.lavish?.queuePrompt('GRILL ANSWERS for round ' + R.round + ' revision ' + R.revision + ': account for every submitted question id. "accept" takes the recommended answer, "choice" the named option, "own" the user\'s text, "ask" is a question to answer or a request to reword before it is settled.', {
+      tag: 'grill-round', text: 'Round ' + R.round + ': ' + items.length + ' of ' + qs.length + ' answered', element: main, queueKey: 'grill-round',
+      data: { question: 'grill-round', round: R.round, revision: R.revision, items },
+    });
+    window.lavish?.sendQueuedPrompts();
+    status.textContent = 'Sent. The tower updates this page with the next round.';
+  };
+  for (const q of qs) cards[q.id]();
+  refresh();
+})();
+</script>
+</body>
+</html>

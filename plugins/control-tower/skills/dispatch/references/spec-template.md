@@ -3,14 +3,14 @@
 Write one `spec.md` per worker. A worker reads only this file and the worker
 prompt, so the spec must stand on its own: no "as discussed", no references to
 the tower's conversation. Keep it short. If a section would be empty, write
-"None." rather than dropping it.
+"None." rather than dropping it. How the worker runs (harness, model, effort)
+is not part of the spec: the user picks it at approval.
 
 ```markdown
 # <Task title>
 
 - Task: <task-id>
 - Worker: <worker-name>
-- Kind: <claude | copilot | ...>
 
 ## Goal
 

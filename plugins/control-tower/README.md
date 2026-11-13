@@ -19,30 +19,41 @@ Each task gets its own herdr-app space. You create the space, start Claude
 in it and run `/control-tower:dispatch`; that session is the task's tower.
 
 1. **Intake**: the tower works out the target repo and asks whether you want
-   a grilling interview first.
+   a grilling interview first. The grilling runs in your browser with
+   [Lavish](https://github.com/kunchenguid/lavish-axi): one card per
+   question with the tower's recommendation; answer them one by one, ask
+   about any of them, and send the round.
 2. **Spec**: written from the grilling or straight from your description.
-   You review it in your browser with [Lavish](https://github.com/kunchenguid/lavish-axi):
-   annotate anything to change, then press Approve. No worker starts until
-   you approve its spec. Without Lavish, the review happens in the chat.
-3. **Launch**: `hc run` starts each worker agent (`claude` by default),
+   You review it in Lavish: annotate anything to change, pick the worker's
+   harness (Claude Code, Copilot CLI), model and effort from dropdowns, and
+   whether a review prep follows, then press Approve. No worker starts until
+   you approve its spec. Without Lavish, all of this happens in the chat.
+3. **Launch**: `hc run` starts each worker agent with the harness, model and effort you picked,
    named `<role>-<slug>`, in a git worktree for coding work or the repo for
    read-only work, with a fixed set of worker rules (draft PRs at most, never
    merge or release). A `herdr.space` label makes each worker a tab in the
    task's space.
 4. **Watch**: a background `hc wait --children any`; workers report with
    `hc send`, and the tower reads each worker's `report.md`.
-5. **Follow-ups**: review, CI and PR-comment workers, each with its own spec,
-   in the same space.
-6. **Escalation**: you talk only to the tower. It relays every worker prompt
+5. **Sign-off**: when a worker is done, the tower presents its report in
+   Lavish. With review prep (adapted from Timo Freiberg's
+   [`review-prep`](https://github.com/TimoFreiberg/dotfiles/blob/main/agents/skills/review-prep/SKILL.md)),
+   read-only reviewers add a brief of the change and findings by severity
+   with draft comments; you mark each finding, answer the questions before
+   sign-off, and choose the next step.
+6. **Follow-ups**: fixes for findings, CI and PR-comment workers, each with
+   its own spec, in the same space.
+7. **Escalation**: you talk only to the tower. It relays every worker prompt
    or question to you in its own chat (batched, with a recommendation) and
    types your answer into the worker; prompt classes you delegate for the
    task it answers itself and logs. It also asks you for decisions, expired
    logins and merge approvals; herdr-app shows it waiting.
-7. **Cleanup**: the task's terminals and worktrees go; the task folder stays.
+8. **Cleanup**: the task's terminals and worktrees go; the task folder stays.
    You close the space.
 
 Task records live in `~/workspace/control-tower/tasks/<date>-<slug>/`
-(`spec.md`, `report.md`, `log.md`, `followups/`).
+(`log.md`, `grilling.html`, `spec.md`/`spec.html`, `report.md`/`report.html`,
+`followups/`).
 
 ## Install
 
@@ -76,8 +87,9 @@ Then, for each task: in herdr-app, open a new space on the workspace
 - Run `dispatch` inside a herdr-app space on the machine where workers
   should run, so the session is a herdr-core terminal (`HC_TERMINAL_ID` set).
 - herdr-core (`hc`) 0.1.21 or newer, `git`, `gh`, `jq`, and a supported agent
-  CLI (`claude` by default).
-- Optional, for spec review in the browser: `lavish-axi` on the workspace
+  CLI: `claude` and `copilot` today (see `skills/dispatch/references/harnesses.md`
+  to add one).
+- Optional, for grilling, spec review and report sign-off in the browser: `lavish-axi` on the workspace
   (tested with 0.1.96), and Coder Connect (Coder Desktop) on the laptop, so
   `http://ai-hub.coder:4387` reaches it. Not the Coder port-share URL: its
   login proxy breaks Lavish's annotations.

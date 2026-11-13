@@ -1,0 +1,212 @@
+<!doctype html>
+<!--
+  Report review page for Lavish. Copy this file to report.html beside the
+  worker's report.md and fill every {{PLACEHOLDER}}. The page only presents:
+  report.md and the review-prep outputs stay the source; never say anything
+  here they do not say.
+
+  - Escape &, <, > and " in every filled-in value.
+  - Without review prep (read-only work, or review prep not chosen), delete
+    the sections marked REVIEW-PREP ONLY, and the findings part of the
+    decision form goes away by itself.
+  - Findings: one <article class="finding"> per finding, ordered by
+    severity (critical, high, medium, low) across both reviewers, with
+    data-fid (C1, L2, ...), data-sev and data-title set. The page adds the
+    disposition control to each.
+  - Sign-off questions: one <li data-qid="S<n>"> per question. The page adds
+    an answer box to each.
+  - {{REVISION}} starts at 1 and goes up when you correct the page after
+    feedback; add a revisions registry entry and data-lavish-revision="r<N>"
+    on changed blocks, as on the spec page.
+  - Self-contained: inline styles and script only, no CDN, no local assets.
+-->
+<html lang="en" data-lavish-annotate="on">
+<head>
+<meta charset="utf-8">
+<title>Report · {{WORKER_NAME}}</title>
+<script type="application/json" data-lavish-revisions>
+[]
+</script>
+<style>
+  :root { --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --accent:#0a66c2; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --bg:#ffffff; --card:#f7f7f9; }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  h1 { font-size: 22px; margin: 4px 0 10px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); overflow-wrap: anywhere; }
+  .chip.done { background: #dafbe1; border-color: #a7d8b4; color: var(--ok); }
+  .chip.blocked, .chip.failed { background: #ffebe9; border-color: #f5b3ae; color: var(--bad); }
+  main { padding: 8px 24px 40px; max-width: 920px; }
+  h2 { font-size: 16px; margin: 26px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  h3 { font-size: 14px; margin: 14px 0 4px; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; overflow-wrap: anywhere; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  pre { font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: #0d1117; color: #e6edf3; padding: 10px 12px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+  .lead { font-size: 17px; padding: 12px 14px; background: #eef6ff; border: 1px solid #c8def5; border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; table-layout: fixed; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  th { color: var(--muted); font-weight: 600; }
+  td.ok { color: var(--ok); font-weight: 600; } td.bad { color: var(--bad); font-weight: 600; }
+  .conflict { margin: 6px 0; padding: 6px 10px; background: #fff8c5; border-left: 3px solid #e6d36b; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .finding { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  .finding[data-sev=critical] { border-left-color: #8b0000; } .finding[data-sev=high] { border-left-color: var(--bad); }
+  .finding[data-sev=medium] { border-left-color: #d4a72c; } .finding[data-sev=low] { border-left-color: #8c959f; }
+  .finding h3 { margin: 0 0 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .sev { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 4px; background: var(--card); border: 1px solid var(--line); }
+  .draft { margin: 6px 0; padding: 6px 10px; background: var(--card); border-radius: 6px; font-size: 14px; }
+  .dispo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .dispo select, .dispo input, textarea, .decide select { font: inherit; font-size: 14px; color: var(--fg); padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; min-width: 0; }
+  .dispo input { flex: 1 1 220px; }
+  textarea { width: 100%; min-height: 56px; resize: vertical; }
+  .questions li { margin: 10px 0; }
+  .decide { margin-top: 30px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+  .decide label { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; }
+  .decide button { margin-top: 12px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--ok); background: var(--ok); color: #fff; font-weight: 600; cursor: pointer; }
+  .decide button:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">control-tower · report for sign-off · revision {{REVISION}}</div>
+  <h1>{{TASK_TITLE}}</h1>
+  <div class="meta">
+    <span class="chip {{OUTCOME}}">{{OUTCOME}}</span>
+    <span class="chip">task {{TASK_ID}}</span>
+    <span class="chip">worker {{WORKER_NAME}}</span>
+    <span class="chip">ran as {{HARNESS}} · {{MODEL}} · effort {{EFFORT}}</span>
+    <span class="chip">branch {{BRANCH, or none}}</span>
+    {{PR: <span class="chip"><a href="...">PR #n</a></span>, or nothing}}
+  </div>
+</header>
+<main>
+  <!-- REVIEW-PREP ONLY: the brief's one sentence; otherwise the report's own summary in one sentence -->
+  <p class="lead">{{ONE_SENTENCE}}</p>
+
+  <h2>Acceptance criteria</h2>
+  <table>
+    <tr><th style="width:45%">Criterion (from the spec)</th><th style="width:12%">Result</th><th>Evidence (from report.md)</th></tr>
+    {{CRITERIA: one <tr> per criterion: <td>statement</td><td class="ok">met</td> or <td class="bad">not met</td> or <td>no evidence</td>, then <td>the decisive evidence</td>}}
+  </table>
+
+  <h2>What changed</h2>
+  {{WHAT_CHANGED: from report.md: commits, branch, PR, files; "None." for read-only work}}
+
+  <!-- REVIEW-PREP ONLY: from here ... -->
+  <h2>Brief</h2>
+  <p class="hint">Written by {{BRIEF_WORKER}} for someone who knows the product but not this change. Notes in yellow are where a finding contradicts it.</p>
+  {{BRIEF: one <h3> + content per brief.md section that has something to say: What it does; What the codebase now contains; Sharp edges; Beyond the stated intent; Hunks worth reading (an <ol>, file:line in <code>). Add <div class="conflict">Contradicted by finding Xn: ...</div> where it applies.}}
+
+  <h2>Findings</h2>
+  <p class="hint">From read-only reviewers ({{REVIEWERS}}), most severe first. Pick what to do with each; nothing is sent until you submit at the bottom.</p>
+  {{FINDINGS: one block per finding, like:
+  <article class="finding" data-fid="C1" data-sev="high" data-title="One-line title">
+    <h3><span class="sev">high</span> C1 · One-line title</h3>
+    <p>Where: <code>path/to/file.go:42</code></p>
+    <pre>quoted code</pre>
+    <p>Why: ...</p>
+    <div class="draft"><b>Draft comment:</b> ...</div>
+  </article>
+  or <p>None.</p>}}
+  <!-- ... to here -->
+
+  <h2>Before you sign off</h2>
+  <ol class="questions">
+    {{SIGNOFF_QUESTIONS: one <li data-qid="S1"> per question: open questions from the report, each critical or high finding, each conflict with the stated intent; or <li>None.</li>}}
+  </ol>
+
+  <section class="decide">
+    <strong>Your decision.</strong> To correct or ask about anything on this
+    page, click it or select its text and write a note. Notes only change this
+    page, never the code. Then choose the next step:
+    <form id="ct-next" data-lavish-question="next-step">
+      <label><input type="radio" name="next" value="signed-off"> <span><b>Signed off.</b> Nothing more from workers. (The tower never merges: you merge the PR yourself when ready.)</span></label>
+      <label><input type="radio" name="next" value="follow-up"> <span><b>Follow-up</b> for the findings marked <em>fix</em> and my answers: the tower drafts a spec for my approval.</span></label>
+      <label><input type="radio" name="next" value="ci-or-comments"> <span><b>Fix CI or address PR comments</b>: the tower drafts that follow-up spec.</span></label>
+      <label><input type="radio" name="next" value="abandon"> <span><b>Abandon</b> the task and clean up.</span></label>
+      <label><input type="radio" name="next" value="other"> <span>Something else (say what below).</span></label>
+      <textarea name="note" placeholder="Anything else for the tower (required for something else)"></textarea>
+      <div class="hint" id="ct-status" role="status" aria-live="polite"></div>
+      <button type="submit">Send decision</button>
+    </form>
+  </section>
+</main>
+<script>
+(() => {
+  const REVISION = {{REVISION}};
+  const WORKER = '{{WORKER_NAME}}';
+  const form = document.getElementById('ct-next');
+  const findings = [...document.querySelectorAll('article.finding[data-fid]')];
+  const questions = [...document.querySelectorAll('.questions li[data-qid]')];
+  const key = 'ct-report:' + WORKER + ':' + REVISION;
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } })();
+  const save = () => { try { localStorage.setItem(key, JSON.stringify(collect())); } catch (e) {} };
+  for (const f of findings) {
+    const s = (saved.findings || {})[f.dataset.fid] || {};
+    const sel = document.createElement('select');
+    for (const [v, t] of [['', 'choose…'], ['fix', 'fix in a follow-up'], ['skip', "won't fix"], ['discuss', 'discuss first']]) sel.append(new Option(t, v));
+    sel.value = s.disposition || '';
+    const note = document.createElement('input');
+    note.placeholder = 'note (optional)'; note.value = s.note || '';
+    const row = document.createElement('div');
+    row.className = 'dispo';
+    row.append('Disposition', sel, note);
+    f.append(row);
+    f._ct = { sel, note };
+    sel.addEventListener('change', () => { save(); render(); });
+    note.addEventListener('input', save);
+  }
+  for (const q of questions) {
+    const t = document.createElement('textarea');
+    t.placeholder = 'Your answer';
+    t.value = (saved.answers || {})[q.dataset.qid] || '';
+    q.append(t);
+    q._ct = t;
+    t.addEventListener('input', () => { save(); render(); });
+  }
+  const r = form.querySelector('input[name=next][value="' + (saved.next || '') + '"]');
+  if (r) r.checked = true;
+  form.note.value = saved.note || '';
+  function collect() {
+    return {
+      next: (form.querySelector('input[name=next]:checked') || {}).value || '',
+      note: form.note.value.trim(),
+      findings: Object.fromEntries(findings.map((f) => [f.dataset.fid, { disposition: f._ct.sel.value, note: f._ct.note.value.trim() }])),
+      answers: Object.fromEntries(questions.map((q) => [q.dataset.qid, q._ct.value.trim()])),
+    };
+  }
+  function render() {
+    const c = collect();
+    const undecided = findings.filter((f) => !f._ct.sel.value).length;
+    const fixes = findings.filter((f) => f._ct.sel.value === 'fix').length;
+    let msg = '', ok = !!c.next;
+    if (!c.next) msg = 'Choose the next step.';
+    else if (c.next === 'other' && !c.note) { ok = false; msg = 'Say what you want in the note.'; }
+    else if (c.next === 'follow-up' && !fixes && !c.note) { ok = false; msg = 'Mark at least one finding as fix, or say what the follow-up is in the note.'; }
+    if (ok && undecided) msg = undecided + ' finding(s) without a disposition: they count as undecided.';
+    form.querySelector('button[type=submit]').disabled = !ok;
+    document.getElementById('ct-status').textContent = msg;
+  }
+  form.addEventListener('change', () => { save(); render(); });
+  form.note.addEventListener('input', () => { save(); render(); });
+  render();
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const c = collect();
+    const items = findings.map((f) => ({ id: f.dataset.fid, label: f.dataset.title, severity: f.dataset.sev, disposition: f._ct.sel.value || 'undecided', note: f._ct.note.value.trim() || undefined }));
+    const answers = questions.map((q) => ({ id: q.dataset.qid, answer: q._ct.value.trim() })).filter((a) => a.answer);
+    window.lavish?.queuePrompt('REPORT DECISION for ' + WORKER + ' (page revision ' + REVISION + '): next step "' + c.next + '". Account for every submitted finding id and answer.' + (c.note ? ' Note: ' + c.note : ''), {
+      tag: 'report-decision', text: 'Next step: ' + c.next + (items.length ? ' · ' + items.filter((i) => i.disposition === 'fix').length + ' to fix' : ''), element: form, queueKey: 'report-decision',
+      data: { question: 'report-decision', worker: WORKER, revision: REVISION, next: c.next, note: c.note || undefined, items, answers },
+    });
+    window.lavish?.sendQueuedPrompts();
+  });
+})();
+</script>
+</body>
+</html>

@@ -14,6 +14,13 @@
     data-lavish-revision="r<N>" on each block you changed or added, so the
     user can see what changed. Lavish lists at most 6 rounds.
   - Keep the page self-contained: inline styles only, no CDN, no local assets.
+  - {{HARNESSES_JSON}} is the JSON from references/harnesses.md (installed
+    harnesses only, with the task's defaults). Replace every "</" in it with
+    "<\/". The page builds the harness, model and effort dropdowns from it;
+    choosing them does not change the revision.
+  - {{REVIEW_PREP_DEFAULT}} is "checked" when the worker changes code, else
+    empty. When checked at approval, the approval also covers the review-prep
+    workers of references/review-prep.md for this worker's result.
 -->
 <html lang="en" data-lavish-annotate="on">
 <head>
@@ -21,6 +28,9 @@
 <title>Spec · {{WORKER_NAME}}</title>
 <script type="application/json" data-lavish-revisions>
 []
+</script>
+<script type="application/json" id="ct-harnesses">
+{{HARNESSES_JSON}}
 </script>
 <style>
   :root { --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --accent:#0a66c2; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --bg:#ffffff; --card:#f7f7f9; }
@@ -50,6 +60,16 @@
   .out li::marker { content: "✕  "; color: var(--bad); }
   .decide { margin-top: 28px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
   .decide button { margin-top: 10px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--ok); background: var(--ok); color: #fff; font-weight: 600; cursor: pointer; }
+  .decide button:disabled { opacity: .5; cursor: not-allowed; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0 0; padding: 10px 12px; background: var(--bg); }
+  legend { font-weight: 600; padding: 0 4px; }
+  .run { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .run label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
+  .run select, .run input { font: inherit; font-size: 14px; color: var(--fg); padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; min-width: 0; }
+  .run input[hidden] { display: none; }
+  .check { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; }
+  .summary { margin-top: 8px; color: var(--muted); font-size: 13px; }
+  @media (max-width: 640px) { .run { grid-template-columns: minmax(0, 1fr); } }
 </style>
 </head>
 <body>
@@ -60,7 +80,6 @@
     <span class="chip status">awaiting approval</span>
     <span class="chip">task {{TASK_ID}}</span>
     <span class="chip">worker {{WORKER_NAME}}</span>
-    <span class="chip">kind {{KIND}}</span>
   </div>
 </header>
 <main>
@@ -92,15 +111,102 @@
   <h2>Report path</h2>
   <p><code>{{REPORT_PATH}}</code></p>
 
-  <section class="decide" data-lavish-question="approval">
-    <strong>Your decision.</strong> To change something, click it or select its
+  <section class="decide">
+    <strong>Your decision.</strong> To change the spec, click it or select its
     text, write a note, queue it, and press <em>Send to Agent</em>. To approve
-    this spec exactly as shown, use the button.
-    <div>
-      <button type="button"
-        onclick="window.lavish?.queuePrompt('APPROVED: the user approves spec revision {{REVISION}} for {{WORKER_NAME}} as shown.', { tag: 'approval', text: 'Approve spec revision {{REVISION}}', element: this, data: { question: 'approval', answer: 'approved', worker: '{{WORKER_NAME}}', revision: {{REVISION}} } }); window.lavish?.sendQueuedPrompts();">Approve revision {{REVISION}}</button>
-    </div>
+    it exactly as shown, pick how the worker runs and use the button.
+    <form id="ct-approve" data-lavish-question="approval">
+      <fieldset>
+        <legend>Worker</legend>
+        <div class="run" data-run="worker">
+          <label>Harness<select name="harness"></select></label>
+          <label>Model<select name="model"></select><input name="model_other" placeholder="model name" hidden></label>
+          <label>Effort<select name="effort"></select></label>
+        </div>
+      </fieldset>
+      <label class="check"><input type="checkbox" name="review_prep" {{REVIEW_PREP_DEFAULT}}>
+        <span>When the worker is done, prepare a sign-off review (a brief and findings from read-only reviewers).</span></label>
+      <fieldset id="ct-reviewer">
+        <legend>Reviewers</legend>
+        <div class="run" data-run="reviewer">
+          <label>Harness<select name="r_harness"></select></label>
+          <label>Model<select name="r_model"></select><input name="r_model_other" placeholder="model name" hidden></label>
+          <label>Effort<select name="r_effort"></select></label>
+        </div>
+      </fieldset>
+      <div class="summary" id="ct-summary" role="status" aria-live="polite"></div>
+      <button type="submit">Approve revision {{REVISION}}</button>
+    </form>
   </section>
+<script>
+(() => {
+  const REVISION = {{REVISION}};
+  const WORKER = '{{WORKER_NAME}}';
+  const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:\/@\[\]-]{0,99}$/;
+  let data = { harnesses: [], defaults: {} };
+  try { data = JSON.parse(document.getElementById('ct-harnesses').textContent); } catch (e) {}
+  const form = document.getElementById('ct-approve');
+  const byId = Object.fromEntries((data.harnesses || []).map((h) => [h.id, h]));
+  const fill = (sel, values, want) => {
+    sel.replaceChildren(...values.map((v) => new Option(v === 'default' ? 'default (harness setting)' : v, v)));
+    sel.value = values.includes(want) ? want : values[0];
+  };
+  const groups = [
+    { key: 'worker', h: 'harness', m: 'model', mo: 'model_other', e: 'effort' },
+    { key: 'reviewer', h: 'r_harness', m: 'r_model', mo: 'r_model_other', e: 'r_effort' },
+  ];
+  const setup = (g, harnessId) => {
+    const d = (data.defaults || {})[g.key] || {};
+    const h = byId[harnessId] || data.harnesses[0];
+    if (!h) return;
+    const models = [...h.models, '__other'];
+    fill(form[g.m], models, h.id === d.harness ? d.model : 'default');
+    form[g.m].querySelector('option[value="__other"]').textContent = 'Other…';
+    if (d.harness === h.id && d.model && !h.models.includes(d.model)) { form[g.m].value = '__other'; form[g.mo].value = d.model; }
+    fill(form[g.e], h.efforts, h.id === d.harness ? d.effort : 'default');
+    form[g.mo].hidden = form[g.m].value !== '__other';
+  };
+  for (const g of groups) {
+    const d = (data.defaults || {})[g.key] || {};
+    form[g.h].replaceChildren(...data.harnesses.map((h) => new Option(h.label || h.id, h.id)));
+    form[g.h].value = byId[d.harness] ? d.harness : (data.harnesses[0] || {}).id;
+    setup(g, form[g.h].value);
+    form[g.h].addEventListener('change', () => { setup(g, form[g.h].value); render(); });
+    form[g.m].addEventListener('change', () => { form[g.mo].hidden = form[g.m].value !== '__other'; render(); });
+    form[g.mo].addEventListener('input', render);
+    form[g.e].addEventListener('change', render);
+  }
+  const read = (g) => {
+    const model = form[g.m].value === '__other' ? form[g.mo].value.trim() : form[g.m].value;
+    return { harness: form[g.h].value, model, effort: form[g.e].value };
+  };
+  const valid = (r) => byId[r.harness] && MODEL_RE.test(r.model) && byId[r.harness].efforts.includes(r.effort);
+  function render() {
+    const rp = form.review_prep.checked;
+    document.getElementById('ct-reviewer').hidden = !rp;
+    const w = read(groups[0]), r = read(groups[1]);
+    const ok = valid(w) && (!rp || valid(r));
+    form.querySelector('button[type=submit]').disabled = !ok || !data.harnesses.length;
+    document.getElementById('ct-summary').textContent = !data.harnesses.length
+      ? 'No harness data on this page: approve in the chat instead.'
+      : ok ? 'Worker: ' + w.harness + ' · ' + w.model + ' · effort ' + w.effort + (rp ? '. Reviewers: ' + r.harness + ' · ' + r.model + ' · effort ' + r.effort + '.' : '. No review prep.')
+           : 'Enter a valid model name (letters, digits and . _ : / @ [ ] -).';
+  }
+  form.review_prep.addEventListener('change', render);
+  render();
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const w = read(groups[0]), rp = form.review_prep.checked, r = rp ? read(groups[1]) : null;
+    if (!valid(w) || (rp && !valid(r))) return;
+    const run = 'worker ' + w.harness + '/' + w.model + '/' + w.effort + (rp ? ', review prep ' + r.harness + '/' + r.model + '/' + r.effort : ', no review prep');
+    window.lavish?.queuePrompt('APPROVED: the user approves spec revision ' + REVISION + ' for ' + WORKER + ' as shown, to run as ' + run + '.', {
+      tag: 'approval', text: 'Approve revision ' + REVISION + ': ' + run, element: form, queueKey: 'approval',
+      data: { question: 'approval', answer: 'approved', worker: WORKER, revision: REVISION, run: w, review_prep: rp, reviewer: r },
+    });
+    window.lavish?.sendQueuedPrompts();
+  });
+})();
+</script>
 </main>
 </body>
 </html>

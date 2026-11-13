@@ -6,6 +6,30 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] - 2026-11-13
+
+### Added
+
+- `dispatch`: grilling in Lavish (`references/grilling-round.html`): one
+  card per question with the recommendation, answered one by one (accept,
+  pick an option, own answer, or ask/reword) and sent per round; drafts
+  survive reloads; a final page confirms the shared understanding.
+- `dispatch`: the spec page has dropdowns for the worker's harness, model
+  and effort, from the new `references/harnesses.md` registry (Claude Code,
+  Copilot CLI; extensible). The approval carries them, the tower validates
+  them and launches the worker with them.
+- `dispatch`: report sign-off in Lavish (`references/report-review.html`),
+  with optional review prep (`references/review-prep.md`, adapted from Timo
+  Freiberg's `review-prep`): read-only correctness and leanness reviewers
+  and a brief writer, chosen at spec approval; the page shows the brief,
+  findings by severity with draft comments and a disposition each, questions
+  before sign-off, and the next step.
+
+### Changed
+
+- `spec.md` no longer has a `Kind` line: how a worker runs is chosen at
+  approval, not in the spec.
+
 ## [0.3.1] - 2026-11-13
 
 ### Changed
