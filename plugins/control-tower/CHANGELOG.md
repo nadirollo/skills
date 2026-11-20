@@ -6,6 +6,18 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] - 2026-11-20
+
+### Changed
+
+- The grilling page shows each question collapsed to its title row (id,
+  title, answer state); click a card to open it. The header and the Send
+  answers bar no longer stick to the screen.
+- Collapsible sections on the grilling page use a toggle button instead of
+  `<details>`, which Lavish's layout check misread as covered text and
+  unreachable controls.
+- The grilling template notes that annotation stays off.
+
 ## [0.6.0] - 2026-11-20
 
 ### Changed

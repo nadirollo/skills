@@ -29,6 +29,9 @@
     ]
   }
 
+  Keep data-lavish-annotate="off" on <html>: grilling is answered through
+  the cards, not annotations.
+
   Plain text only in every value: the page escapes it. The page is styled by
   claude-style.css, which the tower copies into the task folder beside it
   (Lavish serves relative paths only); page-only rules use its variables. No
@@ -65,18 +68,26 @@
   button:disabled { opacity: .5; cursor: not-allowed; }
   .decide { margin-top: 32px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
   .decide button { margin-top: 12px; }
-  header { position: sticky; top: 0; z-index: 1; }
   .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .progress { flex: 1 1 200px; min-width: 0; height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
   .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
   .count { font-size: .85rem; color: var(--fg-muted); }
   .note { margin: 16px 0; padding: 12px 14px; background: var(--accent-soft); border-radius: var(--radius-sm); }
-  details.settled .id, .q h2 .id { font: .75rem var(--font-mono); color: var(--fg-subtle); }
+  .settled .id, .q h2 .id { font: .75rem var(--font-mono); color: var(--fg-subtle); }
   .q { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; margin: 16px 0; }
   .q.done { border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
   .q.ask { border-color: color-mix(in srgb, var(--warning) 50%, var(--border)); }
-  .q h2 { font-size: 1.15rem; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-  .q h2 .state { margin-left: auto; font: 500 .75rem var(--font-sans); color: var(--fg-muted); }
+  .q h2 { font-size: 1.15rem; margin: 0; }
+  /* Collapsible sections use a button plus [hidden], not <details>: Lavish's layout check reads closed <details> content as covered text. */
+  [hidden] { display: none !important; }
+  button.fold { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  button.fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+  button.fold::before { content: '\25B8'; color: var(--fg-subtle); transition: transform .15s; }
+  button.fold[aria-expanded="true"]::before { transform: rotate(90deg); }
+  .q .qbody { margin-top: 8px; }
+  .settled { margin: 16px 0; }
+  .settled > button.fold { font-weight: 500; }
+  .q .state { margin-left: auto; font: 500 .75rem var(--font-sans); color: var(--fg-muted); }
   .q .body p { margin: 6px 0; overflow-wrap: anywhere; }
   .rec { margin: 12px 0; padding: 10px 12px; background: var(--accent-soft); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
   .rec b { color: var(--accent); }
@@ -84,7 +95,7 @@
   .opts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
   .opts label { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; overflow-wrap: anywhere; min-width: 0; }
   .opts label:hover { background: var(--surface-2); }
-  .submit { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--border); margin-top: 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .submit { padding: 12px 0; border-top: 1px solid var(--border); margin-top: 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -103,6 +114,13 @@
     }
     for (const k of kids) if (k != null) n.append(k);
     return n;
+  };
+  // A button that shows or hides body; open is the initial state.
+  const fold = (body, open, ...head) => {
+    const b = el('button', { type: 'button', class: 'fold', 'aria-expanded': String(!!open) }, ...head);
+    body.hidden = !open;
+    b.onclick = () => { body.hidden = !body.hidden; b.setAttribute('aria-expanded', String(!body.hidden)); };
+    return b;
   };
   const paras = (text) => String(text || '').split(/\n\s*\n/).filter((t) => t.trim()).map((t) => el('p', { text: t.trim() }));
   const main = document.getElementById('ct-main');
@@ -123,9 +141,8 @@
 
   const settled = R.settled || [];
   if (settled.length) {
-    main.append(el('details', { class: 'settled', open: R.mode === 'confirm' },
-      el('summary', { text: 'Settled so far (' + settled.length + ')' }),
-      el('ul', {}, ...settled.map((d) => el('li', {}, el('span', { class: 'id', text: d.id + ' ' }), el('b', { text: d.title + ': ' }), d.decision)))));
+    const list = el('ul', {}, ...settled.map((d) => el('li', {}, el('span', { class: 'id', text: d.id + ' ' }), el('b', { text: d.title + ': ' }), d.decision)));
+    main.append(el('section', { class: 'settled' }, fold(list, R.mode === 'confirm', 'Settled so far (' + settled.length + ')'), list));
   }
 
   const progress = () => {
@@ -174,13 +191,16 @@
     for (const o of options) {
       if (o.input.value === s.answer && (s.answer !== 'choice' || o.input.dataset.choice === s.choice)) o.input.checked = true;
     }
-    const card = el('section', { class: 'q', id: q.id },
-      el('h2', {}, el('span', { class: 'id', text: q.id }), q.title, stateLabel),
+    // Collapsed by default: only the title row shows until the user opens the card.
+    const qbody = el('div', { class: 'qbody' },
       el('div', { class: 'body' }, ...paras(q.body)),
       el('div', { class: 'rec' }, el('b', { text: 'Recommended: ' }), q.recommended || ''),
       q.reply ? el('div', { class: 'reply' }, el('b', { text: 'Tower: ' }), q.reply) : null,
       el('div', { class: 'opts', role: 'radiogroup', 'aria-label': q.title }, ...options.map((o) => o.label)),
       text);
+    const card = el('section', { class: 'q', id: q.id },
+      el('h2', {}, fold(qbody, false, el('span', { class: 'id', text: q.id }), q.title, stateLabel)),
+      qbody);
     const update = () => {
       const picked = options.find((o) => o.input.checked);
       s.answer = picked ? picked.input.value : '';
