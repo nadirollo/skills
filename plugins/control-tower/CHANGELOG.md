@@ -6,6 +6,45 @@ All notable changes to the `control-tower` plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-11-20
+
+### Changed
+
+- `dispatch` keeps two files per task: `spec.md` and `summary.md`, plus
+  their Lavish pages. `log.md`, `grilling.html`, per-worker `report.md` /
+  `report.html` and `followups/` are gone.
+- Every task is grilled, scaled to its description; the tower no longer
+  asks whether to grill.
+- One spec per task, with a Work split across one or more workers and new
+  Stop points and Standing yes sections. The spec page shows a run picker
+  per worker; the approval's `data.run` maps worker names to run settings.
+- Workers send their report straight to the tower with `hc send` (a fixed
+  plain-text format); the tower folds each into `summary.md` in the same
+  turn, so it survives compaction. `summary.html` (from
+  `summary-review.html`, decision tag `summary-decision`) replaces the
+  per-worker report page.
+- Review prep is one read-only reviewer that writes both the brief and the
+  correctness/leanness findings, reported into the summary.
+- Delegated approvals live in the spec's Standing yes, quoted and dated.
+- Follow-ups from the summary page are a new spec revision.
+- Lavish is required; the chat-only fallback is gone.
+- Lavish pages are built on `claude-style.css` (a Claude.ai-like look that
+  follows the OS light/dark theme), now bundled in `references/` and copied
+  into each task folder, instead of the templates' old inline theme. This
+  matches the workspace rule that HTML artifacts use that stylesheet.
+- The workspace keeps synced content under `~/workspace/ai-hub/`, the same
+  path as on the laptop: the tasks root is now
+  `~/workspace/ai-hub/control-tower/tasks`, and `setup` creates
+  `~/workspace/ai-hub`.
+
+### Removed
+
+- CI-fix and PR-comment follow-up workers.
+- The machine-wide capacity check and the `ct.worker` label.
+- Renaming the space through herdr-app's document; name it yourself
+  (Shift+F2).
+- Taking over another tower's task.
+
 ## [0.5.1] - 2026-11-13
 
 ### Fixed

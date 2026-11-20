@@ -29,8 +29,10 @@
     ]
   }
 
-  Plain text only in every value: the page escapes it. Keep it
-  self-contained: inline styles and script only, no CDN, no local assets.
+  Plain text only in every value: the page escapes it. The page is styled by
+  claude-style.css, which the tower copies into the task folder beside it
+  (Lavish serves relative paths only); page-only rules use its variables. No
+  other assets.
 -->
 <html lang="en" data-lavish-annotate="off">
 <head>
@@ -39,45 +41,50 @@
 <script type="application/json" id="ct-round">
 {{ROUND_JSON}}
 </script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="claude-style.css">
 <style>
-  :root { --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --accent:#0a66c2; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --bg:#ffffff; --card:#f7f7f9; }
-  * { box-sizing: border-box; }
-  html, body { background: var(--bg); }
-  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }
-  header { padding: 18px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 1; }
-  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  h1 { font-size: 22px; margin: 4px 0 8px; }
-  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .progress { flex: 1 1 200px; min-width: 0; height: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
-  .progress > div { height: 100%; width: 0; background: var(--ok); transition: width .2s; }
-  .count { font-size: 13px; color: var(--muted); }
-  main { padding: 8px 24px 40px; max-width: 880px; }
-  .note { margin: 14px 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--card); border-radius: 0 6px 6px 0; }
-  details.settled { margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
-  details.settled summary { cursor: pointer; font-weight: 600; }
-  .settled li { margin: 4px 0; overflow-wrap: anywhere; }
-  .settled .id { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
-  .q { border: 1px solid var(--line); border-radius: 10px; margin: 16px 0; padding: 14px 16px; }
-  .q.done { border-color: #a7d8b4; }
-  .q.ask { border-color: #e6d36b; }
-  .q h2 { font-size: 16px; margin: 0 0 6px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-  .q h2 .id { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
-  .q h2 .state { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); }
-  .q .body p { margin: 6px 0; overflow-wrap: anywhere; }
-  .rec { margin: 10px 0; padding: 8px 10px; background: #eef6ff; border: 1px solid #c8def5; border-radius: 6px; overflow-wrap: anywhere; }
-  .rec b { color: var(--accent); }
-  .reply { margin: 10px 0; padding: 8px 10px; background: #fff8c5; border: 1px solid #e6d36b; border-radius: 6px; overflow-wrap: anywhere; }
-  .opts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
-  .opts label { display: flex; gap: 8px; align-items: flex-start; padding: 4px 6px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; min-width: 0; }
-  .opts label:hover { background: var(--card); }
-  textarea { width: 100%; min-height: 64px; font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; resize: vertical; }
+  /* Page-only rules on top of claude-style.css: use its variables, so dark mode follows. */
+  header { padding: 22px max(24px, calc((100% - 880px) / 2 + 24px)) 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  header h1 { font-size: 1.75rem; margin: 4px 0 10px; }
+  main { max-width: 880px; padding-top: 20px; }
+  main h2 { font-size: 1.3rem; margin: 30px 0 10px; }
+  li { overflow-wrap: anywhere; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: .75rem; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--fg-muted); overflow-wrap: anywhere; }
+  .chip.status { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+  .chip.done { background: var(--success-soft); color: var(--success); border-color: transparent; }
+  .chip.blocked, .chip.failed { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+  .hint { font-size: .85rem; color: var(--fg-muted); }
+  .decision { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 8px 12px; margin: 8px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; overflow-wrap: anywhere; }
+  textarea { width: 100%; min-height: 64px; resize: vertical; }
   textarea[hidden] { display: none; }
-  .submit { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--line); margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); cursor: pointer; }
-  button.primary { border-color: var(--ok); background: var(--ok); color: #fff; font-weight: 600; }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  .hint { font-size: 13px; color: var(--muted); }
-  .decision { border-left: 3px solid var(--accent); background: var(--card); padding: 6px 10px; margin: 6px 0; border-radius: 0 6px 6px 0; overflow-wrap: anywhere; }
+  .decide { margin-top: 32px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .decide button { margin-top: 12px; }
+  header { position: sticky; top: 0; z-index: 1; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .progress { flex: 1 1 200px; min-width: 0; height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .count { font-size: .85rem; color: var(--fg-muted); }
+  .note { margin: 16px 0; padding: 12px 14px; background: var(--accent-soft); border-radius: var(--radius-sm); }
+  details.settled .id, .q h2 .id { font: .75rem var(--font-mono); color: var(--fg-subtle); }
+  .q { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; margin: 16px 0; }
+  .q.done { border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
+  .q.ask { border-color: color-mix(in srgb, var(--warning) 50%, var(--border)); }
+  .q h2 { font-size: 1.15rem; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .q h2 .state { margin-left: auto; font: 500 .75rem var(--font-sans); color: var(--fg-muted); }
+  .q .body p { margin: 6px 0; overflow-wrap: anywhere; }
+  .rec { margin: 12px 0; padding: 10px 12px; background: var(--accent-soft); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+  .rec b { color: var(--accent); }
+  .reply { margin: 12px 0; padding: 10px 12px; background: var(--warning-soft); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+  .opts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .opts label { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; overflow-wrap: anywhere; min-width: 0; }
+  .opts label:hover { background: var(--surface-2); }
+  .submit { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--border); margin-top: 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 </style>
 </head>
 <body>

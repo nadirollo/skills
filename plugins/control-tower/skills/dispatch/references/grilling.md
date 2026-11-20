@@ -5,8 +5,11 @@ Adapted from the `grilling` skill in
 (MIT, Copyright (c) 2026 Matt Pocock; see `LICENSE-grilling`). The text below the line is
 the original body, unchanged; only its frontmatter was removed.
 
-In `dispatch`, the grilling ends when the frontier is empty and the user confirms the
-shared understanding. Its output is the "Decisions made" section of `spec.md`.
+In `dispatch`, every task is grilled, scaled to its description: a loose one gets real
+rounds; a thorough one may need a single round that states your understanding and asks
+only what is still open. The grilling ends when the frontier is empty and the user
+confirms the shared understanding. Its output is the "Decisions made" section of
+`spec.md`.
 
 ---
 

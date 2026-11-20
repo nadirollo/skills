@@ -25,8 +25,8 @@ Every harness also gets two entries that are not flags:
 
 ## Building the launch command
 
-Use the values from the approval prompt (see dispatch step 3a), never from a
-note. Before using them, check that the harness is in this table and
+Use the values from the approval prompt (dispatch step 3: `data.run` has
+one entry per worker), never from a note. Before using them, check that the harness is in this table and
 installed; the model is one of its `models.json` ids (or the fallback list),
 `default`, or a valid Other name; and the effort is in that model's
 `efforts` if it has them, else the harness's. Single-quote the model in the
@@ -62,8 +62,8 @@ The spec review page reads one JSON object (template slot
 3. If `generated_at` is older than 7 days, or an entry has `"stale": true`,
    use it anyway and mention it once.
 4. **`defaults`:** what the page preselects, from the task's settings
-   (dispatch Settings, or the user's override in `log.md`). A default model
-   the list does not have shows as Other.
+   (dispatch Settings, or an override the user gave for this task). A
+   default model the list does not have shows as Other.
 
 ```json
 {

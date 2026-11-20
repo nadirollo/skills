@@ -134,7 +134,7 @@ suggests: **do not edit any SSH file yourself.**
 
 ## 3. Workspace base
 
-1. Shell setup and `~/.local/bin`, `~/.local/opt`, `~/workspace`
+1. Shell setup and `~/.local/bin`, `~/.local/opt`, `~/workspace/ai-hub`
    directories, from `references/files.md`.
 2. The server's own Coder CLI at `~/.local/bin/coder`, the
    `with-coder-github` and `gh` wrappers, and the git credential helper.
@@ -323,11 +323,11 @@ Install both marketplaces from GitHub, so the workspace updates with
    claude plugin install coding@fastly-agent-skills-internal --scope user
    ```
 
-   `coding` provides the `coding:code-review` skill that dispatch's review
-   workers use. Then show the user the other plugins installed from that
+   `coding` provides the `coding:code-review` skill, useful for reviewing
+   workers' draft PRs. Then show the user the other plugins installed from that
    marketplace on the laptop (`claude plugin list`) and install the ones
    they pick, with `--scope user`.
-3. Create the tasks root, `~/workspace/control-tower/tasks`, if missing.
+3. Create the tasks root, `~/workspace/ai-hub/control-tower/tasks`, if missing.
 4. **Model list.** Write `~/.config/control-tower/models.json`, which the
    dispatch spec page loads into its model dropdowns, by running the
    `models` skill's probe on the workspace (about a minute; it sends nothing

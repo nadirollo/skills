@@ -1,74 +1,84 @@
 <!doctype html>
 <!--
-  Spec review page for Lavish. Copy this file to <spec-dir>/spec.html and fill
-  every {{PLACEHOLDER}} from spec.md. spec.md stays the source of truth; this
-  page is only the review copy and must say exactly what spec.md says.
+  Spec review page for Lavish. Write it over <task>/spec.html (the grilling
+  page) and fill every {{PLACEHOLDER}} from spec.md. spec.md stays the source
+  of truth; this page is only the review copy and must say exactly what
+  spec.md says.
 
   - Escape &, <, > and " in every filled-in value.
   - Keep one element per bullet, criterion and row, so the user can annotate
     each one separately.
-  - {{REVISION}} starts at 1 and goes up by one each time spec.md changes. It
-    is in the Approve button's data, so an approval names the version the
-    user saw.
+  - {{REVISION}} is spec.md's Revision. It starts at 1 and goes up by one
+    each time spec.md changes (Standing yes excepted). It is in the Approve
+    button's data, so an approval names the version the user saw.
   - After a round of edits, add an entry to the revisions registry and put
     data-lavish-revision="r<N>" on each block you changed or added, so the
     user can see what changed. Lavish lists at most 6 rounds.
-  - Keep the page self-contained: inline styles only, no CDN, no local assets.
-  - {{HARNESSES_JSON}} is built as references/harnesses.md says (from
-    ~/.config/control-tower/models.json when it exists, plus the task's
-    defaults). Replace every "</" in it with "<\/". The page builds the harness, model and effort dropdowns from it;
-    choosing them does not change the revision.
-  - {{REVIEW_PREP_DEFAULT}} is "checked" when the worker changes code, else
-    empty. When checked at approval, the approval also covers the review-prep
-    workers of references/review-prep.md for this worker's result.
+  - Styled by claude-style.css, which the tower copies into the task folder
+    beside the page (Lavish serves relative paths only). Page-only rules go in
+    the <style> block, using its variables. No other assets.
+  - {{HARNESSES_JSON}} is built as references/harnesses.md says. Replace
+    every "</" in it with "<\/". The page builds one harness, model and
+    effort picker per worker, plus one for the reviewer; choosing them does
+    not change the revision.
+  - {{WORKERS_JSON}} lists the Work split's workers, in order:
+    [{"name": "impl-forge-tags", "role": "impl"}]. Same "</" rule.
+  - {{REVIEW_PREP_DEFAULT}} is "checked" when any worker changes code, else
+    empty. When checked at approval, the approval also covers the reviewer
+    of references/review-prep.md.
 -->
 <html lang="en" data-lavish-annotate="on">
 <head>
 <meta charset="utf-8">
-<title>Spec · {{WORKER_NAME}}</title>
+<title>Spec · {{TASK_TITLE}}</title>
 <script type="application/json" data-lavish-revisions>
 []
 </script>
 <script type="application/json" id="ct-harnesses">
 {{HARNESSES_JSON}}
 </script>
+<script type="application/json" id="ct-workers">
+{{WORKERS_JSON}}
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="claude-style.css">
 <style>
-  :root { --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --accent:#0a66c2; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --bg:#ffffff; --card:#f7f7f9; }
-  * { box-sizing: border-box; }
-  html, body { background: var(--bg); }
-  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }
-  header { padding: 18px 24px; border-bottom: 1px solid var(--line); }
-  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  h1 { font-size: 22px; margin: 4px 0 10px; }
+  /* Page-only rules on top of claude-style.css: use its variables, so dark mode follows. */
+  header { padding: 22px max(24px, calc((100% - 880px) / 2 + 24px)) 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  header h1 { font-size: 1.75rem; margin: 4px 0 10px; }
+  main { max-width: 880px; padding-top: 20px; }
+  main h2 { font-size: 1.3rem; margin: 30px 0 10px; }
+  li { overflow-wrap: anywhere; }
   .meta { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
-  .chip.status { background: #fff8c5; border-color: #e6d36b; color: var(--warn); }
-  main { padding: 8px 24px 32px; max-width: 880px; }
-  h2 { font-size: 15px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
-  p { margin: 6px 0; }
-  ul { margin: 6px 0; padding-left: 20px; }
-  li { margin: 3px 0; overflow-wrap: anywhere; }
-  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
-  table { border-collapse: collapse; width: 100%; font-size: 14px; table-layout: fixed; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
-  th { color: var(--muted); font-weight: 600; width: 140px; }
-  .decision { border-left: 3px solid var(--accent); background: var(--card); padding: 6px 10px; margin: 6px 0; border-radius: 0 6px 6px 0; }
+  .chip { font-size: .75rem; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--fg-muted); overflow-wrap: anywhere; }
+  .chip.status { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+  .chip.done { background: var(--success-soft); color: var(--success); border-color: transparent; }
+  .chip.blocked, .chip.failed { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+  .hint { font-size: .85rem; color: var(--fg-muted); }
+  .decision { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 8px 12px; margin: 8px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; overflow-wrap: anywhere; }
+  textarea { width: 100%; min-height: 64px; resize: vertical; }
+  textarea[hidden] { display: none; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .decide { margin-top: 32px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .decide button { margin-top: 12px; }
+  .context th { width: 160px; }
   .criteria { padding-left: 0; }
   .criteria li { list-style: none; }
-  .criteria li::before { content: "☐  "; color: var(--ok); }
-  .criteria .how { display: block; color: var(--muted); font-size: 13px; margin-left: 22px; }
-  .out li::marker { content: "✕  "; color: var(--bad); }
-  .decide { margin-top: 28px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
-  .decide button { margin-top: 10px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--ok); background: var(--ok); color: #fff; font-weight: 600; cursor: pointer; }
-  .decide button:disabled { opacity: .5; cursor: not-allowed; }
-  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0 0; padding: 10px 12px; background: var(--bg); }
-  legend { font-weight: 600; padding: 0 4px; }
+  .criteria li::before { content: "☐  "; color: var(--success); }
+  .criteria .how { display: block; color: var(--fg-muted); font-size: .85rem; margin-left: 22px; }
+  .out li::marker { content: "✕  "; color: var(--danger); }
+  .worker-part { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin: 8px 0; }
+  .worker-part h3 { font-size: 1rem; margin: 0 0 4px; }
+  fieldset { margin: 12px 0 0; background: var(--bg); }
   .run { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .run label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0; }
-  .run select, .run input { font: inherit; font-size: 14px; color: var(--fg); padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; min-width: 0; }
+  .run label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--fg-muted); min-width: 0; }
+  .run select, .run input { width: 100%; min-width: 0; }
   .run input[hidden] { display: none; }
-  .check { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; }
-  .summary { margin-top: 8px; color: var(--muted); font-size: 13px; }
+  .check { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
+  .summary { margin-top: 10px; color: var(--fg-muted); font-size: .85rem; }
   @media (max-width: 640px) { .run { grid-template-columns: minmax(0, 1fr); } }
 </style>
 </head>
@@ -79,7 +89,7 @@
   <div class="meta">
     <span class="chip status">awaiting approval</span>
     <span class="chip">task {{TASK_ID}}</span>
-    <span class="chip">worker {{WORKER_NAME}}</span>
+    <span class="chip">{{N}} worker(s)</span>
   </div>
 </header>
 <main>
@@ -87,20 +97,34 @@
   <p>{{GOAL}}</p>
 
   <h2>Context</h2>
-  <table>
+  <div class="table-wrap">
+  <table class="context">
     <tr><th>Repo</th><td>{{REPO}}</td></tr>
-    <tr><th>Worktree</th><td>{{WORKTREE}}</td></tr>
-    <tr><th>Branch</th><td>{{BRANCH}}</td></tr>
     <tr><th>Relevant files</th><td>{{FILES: one <div> per file, path in <code>, then its one-line reason}}</td></tr>
     <tr><th>Links</th><td>{{LINKS, or None.}}</td></tr>
   </table>
+  </div>
 
   <h2>Decisions made</h2>
   {{DECISIONS: one <div class="decision"> per decision, or <p>None.</p>}}
 
+  <h2>Work split</h2>
+  {{WORK_SPLIT: one block per worker, like:
+  <div class="worker-part">
+    <h3>impl-forge-tags (impl)</h3>
+    <div>Does: ...</div>
+    <div>Working directory: <code>...</code></div>
+    <div>Branch: <code>...</code></div>
+  </div>}}
+
   <h2>Acceptance criteria</h2>
   <ul class="criteria">
-    {{CRITERIA: one <li> per criterion: the statement, then <span class="how">Check: ...</span>}}
+    {{CRITERIA: one <li> per criterion: the statement, then <span class="how">Check: ... (worker name when there are several)</span>}}
+  </ul>
+
+  <h2>Stop points</h2>
+  <ul>
+    {{STOP_POINTS: one <li> per item, or <li>None.</li>}}
   </ul>
 
   <h2>Out of scope</h2>
@@ -108,43 +132,39 @@
     {{OUT_OF_SCOPE: one <li> per item, or <li>None.</li>}}
   </ul>
 
-  <h2>Report path</h2>
-  <p><code>{{REPORT_PATH}}</code></p>
+  <h2>Standing yes</h2>
+  <ul>
+    {{STANDING_YES: one <li> per entry, quoted, with date and workers; or <li>None.</li>}}
+  </ul>
 
   <section class="decide">
     <strong>Your decision.</strong> To change the spec, click it or select its
     text, write a note, queue it, and press <em>Send to Agent</em>. To approve
-    it exactly as shown, pick how the worker runs and use the button.
+    it exactly as shown, pick how each worker runs and use the button.
     <form id="ct-approve" data-lavish-question="approval">
-      <fieldset>
-        <legend>Worker</legend>
-        <div class="run" data-run="worker">
-          <label>Harness<select name="harness"></select></label>
-          <label>Model<select name="model"></select><input name="model_other" placeholder="model name" hidden></label>
-          <label>Effort<select name="effort"></select></label>
-        </div>
-      </fieldset>
+      <div id="ct-runs"></div>
       <label class="check"><input type="checkbox" name="review_prep" {{REVIEW_PREP_DEFAULT}}>
-        <span>When the worker is done, prepare a sign-off review (a brief and findings from read-only reviewers).</span></label>
+        <span>When the workers are done, prepare a sign-off review (a brief and findings from one read-only reviewer).</span></label>
       <fieldset id="ct-reviewer">
-        <legend>Reviewers</legend>
-        <div class="run" data-run="reviewer">
+        <legend>Reviewer</legend>
+        <div class="run">
           <label>Harness<select name="r_harness"></select></label>
           <label>Model<select name="r_model"></select><input name="r_model_other" placeholder="model name" hidden></label>
           <label>Effort<select name="r_effort"></select></label>
         </div>
       </fieldset>
       <div class="summary" id="ct-summary" role="status" aria-live="polite"></div>
-      <button type="submit">Approve revision {{REVISION}}</button>
+      <button class="primary" type="submit">Approve revision {{REVISION}}</button>
     </form>
   </section>
 <script>
 (() => {
   const REVISION = {{REVISION}};
-  const WORKER = '{{WORKER_NAME}}';
+  const TASK = '{{TASK_ID}}';
   const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:\/@\[\]-]{0,99}$/;
-  let data = { harnesses: [], defaults: {} };
-  try { data = JSON.parse(document.getElementById('ct-harnesses').textContent); } catch (e) {}
+  const json = (id, fallback) => { try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return fallback; } };
+  const data = json('ct-harnesses', { harnesses: [], defaults: {} });
+  const workers = json('ct-workers', []);
   const form = document.getElementById('ct-approve');
   const byId = Object.fromEntries((data.harnesses || []).map((h) => [h.id, h]));
   // Models are strings or {id, label, group, efforts} (from models.json).
@@ -171,10 +191,23 @@
     sel.replaceChildren(...values.map((v) => new Option(v === 'default' ? 'default (harness setting)' : v, v)));
     sel.value = values.includes(want) ? want : values[0];
   };
-  const groups = [
-    { key: 'worker', h: 'harness', m: 'model', mo: 'model_other', e: 'effort' },
-    { key: 'reviewer', h: 'r_harness', m: 'r_model', mo: 'r_model_other', e: 'r_effort' },
-  ];
+  // One picker per worker, built from the Work split.
+  const runs = document.getElementById('ct-runs');
+  workers.forEach((w, i) => {
+    const fs = document.createElement('fieldset');
+    const lg = document.createElement('legend');
+    lg.textContent = 'Worker · ' + w.name + (w.role ? ' (' + w.role + ')' : '');
+    fs.append(lg);
+    const row = document.createElement('div');
+    row.className = 'run';
+    row.innerHTML = '<label>Harness<select name="w' + i + '_harness"></select></label>'
+      + '<label>Model<select name="w' + i + '_model"></select><input name="w' + i + '_model_other" placeholder="model name" hidden></label>'
+      + '<label>Effort<select name="w' + i + '_effort"></select></label>';
+    fs.append(row);
+    runs.append(fs);
+  });
+  const groups = workers.map((w, i) => ({ key: 'worker', name: w.name, h: 'w' + i + '_harness', m: 'w' + i + '_model', mo: 'w' + i + '_model_other', e: 'w' + i + '_effort' }));
+  const reviewer = { key: 'reviewer', h: 'r_harness', m: 'r_model', mo: 'r_model_other', e: 'r_effort' };
   const syncEfforts = (g, want) => {
     const h = byId[form[g.h].value];
     if (!h) return;
@@ -191,7 +224,7 @@
     form[g.mo].hidden = form[g.m].value !== '__other';
     syncEfforts(g, mine ? d.effort : 'default');
   };
-  for (const g of groups) {
+  for (const g of [...groups, reviewer]) {
     const d = (data.defaults || {})[g.key] || {};
     form[g.h].replaceChildren(...data.harnesses.map((h) => new Option(h.label || h.id, h.id)));
     form[g.h].value = byId[d.harness] ? d.harness : (data.harnesses[0] || {}).id;
@@ -206,27 +239,30 @@
     return { harness: form[g.h].value, model, effort: form[g.e].value };
   };
   const valid = (r) => byId[r.harness] && MODEL_RE.test(r.model) && effortsFor(byId[r.harness], r.model).includes(r.effort);
+  const fmt = (r) => r.harness + ' · ' + r.model + ' · effort ' + r.effort;
   function render() {
     const rp = form.review_prep.checked;
     document.getElementById('ct-reviewer').hidden = !rp;
-    const w = read(groups[0]), r = read(groups[1]);
-    const ok = valid(w) && (!rp || valid(r));
+    const ws = groups.map(read), r = read(reviewer);
+    const ok = workers.length && ws.every(valid) && (!rp || valid(r));
     form.querySelector('button[type=submit]').disabled = !ok || !data.harnesses.length;
     document.getElementById('ct-summary').textContent = !data.harnesses.length
       ? 'No harness data on this page: approve in the chat instead.'
-      : ok ? 'Worker: ' + w.harness + ' · ' + w.model + ' · effort ' + w.effort + (rp ? '. Reviewers: ' + r.harness + ' · ' + r.model + ' · effort ' + r.effort + '.' : '. No review prep.')
+      : !workers.length ? 'No workers on this page: approve in the chat instead.'
+      : ok ? groups.map((g, i) => g.name + ': ' + fmt(ws[i])).join('. ') + (rp ? '. Reviewer: ' + fmt(r) + '.' : '. No review prep.')
            : 'Enter a valid model name (letters, digits and . _ : / @ [ ] -).';
   }
   form.review_prep.addEventListener('change', render);
   render();
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
-    const w = read(groups[0]), rp = form.review_prep.checked, r = rp ? read(groups[1]) : null;
-    if (!valid(w) || (rp && !valid(r))) return;
-    const run = 'worker ' + w.harness + '/' + w.model + '/' + w.effort + (rp ? ', review prep ' + r.harness + '/' + r.model + '/' + r.effort : ', no review prep');
-    window.lavish?.queuePrompt('APPROVED: the user approves spec revision ' + REVISION + ' for ' + WORKER + ' as shown, to run as ' + run + '.', {
-      tag: 'approval', text: 'Approve revision ' + REVISION + ': ' + run, element: form, queueKey: 'approval',
-      data: { question: 'approval', answer: 'approved', worker: WORKER, revision: REVISION, run: w, review_prep: rp, reviewer: r },
+    const ws = groups.map(read), rp = form.review_prep.checked, r = rp ? read(reviewer) : null;
+    if (!ws.every(valid) || (rp && !valid(r))) return;
+    const run = Object.fromEntries(groups.map((g, i) => [g.name, ws[i]]));
+    const text = groups.map((g, i) => g.name + ' ' + ws[i].harness + '/' + ws[i].model + '/' + ws[i].effort).join(', ') + (rp ? ', reviewer ' + r.harness + '/' + r.model + '/' + r.effort : ', no review prep');
+    window.lavish?.queuePrompt('APPROVED: the user approves spec revision ' + REVISION + ' of ' + TASK + ' as shown, to run as ' + text + '.', {
+      tag: 'approval', text: 'Approve revision ' + REVISION + ': ' + text, element: form, queueKey: 'approval',
+      data: { question: 'approval', answer: 'approved', task: TASK, revision: REVISION, run, review_prep: rp, reviewer: r },
     });
     window.lavish?.sendQueuedPrompts();
   });
