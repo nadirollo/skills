@@ -16,8 +16,7 @@ contributing widely.
 ## Testing locally
 
 ```
-claude plugin marketplace add ~/workspace/ai-hub/skills   # laptop
-claude plugin marketplace add ~/workspace/skills          # ai-hub
+claude plugin marketplace add ~/workspace/ai-hub/skills   # laptop and ai-hub (same synced path)
 claude plugin install <plugin>@nadirollo-skills --scope user
 ```
 
